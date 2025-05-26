@@ -6,15 +6,19 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.AfterAll;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.client.RestTemplate;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -26,11 +30,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles({"test", "default"})
 @Getter
-@Accessors(fluent = true)
+@Accessors(fluent=true)
 @Slf4j
 public class AbstractIT {
     private static final ClassLoader CLASS_LOADER = AbstractIT.class.getClassLoader();
@@ -40,23 +46,23 @@ public class AbstractIT {
     private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER = DockerImageName.parse("otel/opentelemetry-collector:latest");
     private static final DockerImageName DOCKER_IMAGE_NAME_GRAFANA_LGTM = DockerImageName.parse("grafana/otel-lgtm:latest");
 
-    private static final AtomicReference<GenericContainer<?>> CONTAINER_OTEL_CONTRIB = new AtomicReference<>(); // OpenTelemetry + Contrib
-    private static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
+    protected static final AtomicReference<GenericContainer<?>> CONTAINER_OTEL_CONTRIB = new AtomicReference<>(); // OpenTelemetry + Contrib
+    protected static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = List.of(CONTAINER_OTEL_CONTRIB, CONTAINER_GRAFANA_LGTM);
 
-    @AfterAll
-    static void stopContainers() {
-        for (final AtomicReference<GenericContainer<?>> containerReference : CONTAINER_REFERENCES) {
-            if (containerReference.get() == null) {
-                log.warn("Container reference is null.");
-            } else if (!containerReference.get().isRunning()) {
-                log.info("Container is not running.");
-            } else {
-                final String logs = containerReference.get().getLogs().replaceAll("(\r)?\n(\r)?", "$1\n$2CONTAINER>>> ");
-                log.info("Container stopping...\nCONTAINER>>> {}", logs);
-                containerReference.get().stop();
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            for (final AtomicReference<GenericContainer<?>> containerReference : CONTAINER_REFERENCES) {
+                if (containerReference.get() == null) {
+                    log.warn("Container reference is null.");
+                } else if (!containerReference.get().isRunning()) {
+                    log.info("Container is not running.");
+                } else {
+                    log.info("Container stopping...\n{}", prefixAllLines("CONTAINER", containerReference.get().getLogs()));
+                    containerReference.get().stop();
+                }
             }
-        }
+        }));
     }
 
     @Autowired
@@ -72,6 +78,16 @@ public class AbstractIT {
         return "http://" + this.serverAddress() + ":" + this.localServerPort();
     }
 
+    protected String doHttpGet(final String url) {
+        log.info("Getting URL {}", url);
+        final RestTemplate restTemplate = new RestTemplateBuilder().build();
+        final ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+        final HttpStatusCode statusCode = responseEntity.getStatusCode();
+        final String responseBody = responseEntity.getBody();
+        assertEquals(HttpStatus.OK, statusCode);
+        assertNotNull(responseBody);
+        return responseBody;
+    }
 
     // Spring Boot actuator properties: https://docs.spring.io/spring-boot/appendix/application-properties/index.html
     @DynamicPropertySource
@@ -81,25 +97,15 @@ public class AbstractIT {
 
         final Map<String, String> configMap = new LinkedHashMap<>();
 
-        configMap.put("management.otlp.metrics.export.enabled", "true");
+        /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0)
         configMap.put("management.otlp.metrics.export.url", "http://localhost:" + grpcPort);
-        configMap.put("management.otlp.metrics.export.step", "1m");
+        configMap.put("management.otlp.metrics.export.step", "5s");
 
-        configMap.put("management.otlp.tracing.export.enabled", "true");
+        /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties] (since 3.4.0)
         configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort);
-        configMap.put("management.otlp.tracing.transport", "grpc");
-        configMap.put("management.otlp.tracing.compression", "gzip");
 
-        configMap.put("management.otlp.logging.export.enabled", "true");
+        /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties] (since 3.4.0)
         configMap.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort);
-        configMap.put("management.otlp.logging.transport", "grpc");
-        configMap.put("management.otlp.logging.compression", "gzip");
-
-        configMap.put("otel.propagators", "tracecontext,b3");
-
-        configMap.put("otel.resource.attributes.deployment.environment", "integTest");
-        configMap.put("otel.resource.attributes.service.name", "otel-demo_integTest");
-        configMap.put("otel.resource.attributes.service.namespace", "justincranford-forescout");
 
         log.info("Spring Boot Actuator dynamic properties for otel-contrib testcontainer: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
         configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
@@ -182,5 +188,9 @@ public class AbstractIT {
         grafanaThread.setDaemon(true);
         grafanaThread.start();
         return grafanaThread;
+    }
+
+    protected static @NotNull String prefixAllLines(final String prefix, final String content) {
+        return prefix + ">>> " + content.replaceAll("(\r)?\n(\r)?", "$1\n$2" + prefix+ ">>> ");
     }
 }

@@ -8,11 +8,13 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
 class HelloControllerIT extends AbstractIT {
+    private static final long WAIT_MILLIS_API_IN_PROMETHEUS_METRICS = 10_000L;
+    private static final long WAIT_MILLIS_API_IN_OTEL_METRICS = 10_000L;
+
     @Test
     void testPrometheus() {
         final RestTemplate restTemplate = new RestTemplateBuilder().build();
@@ -21,6 +23,25 @@ class HelloControllerIT extends AbstractIT {
         final String responseBody = responseEntity.getBody();
         assertEquals(HttpStatus.OK, statusCode);
         assertNotNull(responseBody);
-        log.info("Prometheus response:\n{}", responseBody);
+        log.info("Hello API response:\n{}", responseBody);
+
+        final String urlMetricsPrometheus = super.baseUrl() + "/actuator/prometheus";
+        final String urlMetricsOtel = "http://localhost:" + CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317) + "/v1/metrics";
+
+        String latestResponsePrometheus, latestResponseOtel;
+
+        final long endTimeMillisPrometheus = System.currentTimeMillis() + WAIT_MILLIS_API_IN_PROMETHEUS_METRICS; // 10 seconds timeout
+        do {
+            latestResponsePrometheus = doHttpGet(urlMetricsPrometheus);
+            log.info("Prometheus response:\nPROMETHEUS>>>{}", prefixAllLines("PROMETHEUS", latestResponsePrometheus));
+        } while (!latestResponsePrometheus.contains("/hello") && System.currentTimeMillis() < endTimeMillisPrometheus);
+        assertTrue(latestResponsePrometheus.contains("/hello"));
+
+        final long endTimeMillisOtel = System.currentTimeMillis() + WAIT_MILLIS_API_IN_OTEL_METRICS; // 10 seconds timeout
+        do {
+            latestResponseOtel = doHttpGet(urlMetricsOtel);
+            log.info("Otel response:\nPROMETHEUS>>>{}", prefixAllLines("OTEL", latestResponsePrometheus));
+        } while (!latestResponseOtel.contains("/hello") && System.currentTimeMillis() < endTimeMillisOtel);
+        assertTrue(latestResponseOtel.contains("/hello"));
     }
 }

@@ -1,6 +1,15 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.0.7'
+
+	// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot
+//	id 'org.springframework.boot' version '3.5.0'
+	id 'org.springframework.boot' version '3.4.6'
+//	id 'org.springframework.boot' version '3.3.12'
+//	id 'org.springframework.boot' version '3.2.12'
+//	id 'org.springframework.boot' version '3.1.12'
+//	id 'org.springframework.boot' version '3.0.7'
+
+	// https://mvnrepository.com/artifact/io.spring.dependency-management/io.spring.dependency-management.gradle.plugin
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -19,6 +28,7 @@ repositories {
 
 dependencyManagement {
 	imports {
+		// https://mvnrepository.com/artifact/org.testcontainers/testcontainers-bom/1.21.0
 		mavenBom 'org.testcontainers:testcontainers-bom:1.21.0'
 	}
 }
