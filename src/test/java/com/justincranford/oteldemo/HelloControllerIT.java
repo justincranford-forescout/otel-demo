@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
+import static com.justincranford.oteldemo.containers.ContainerManager.CONTAINER_OTEL_CONTRIB;
+import static com.justincranford.oteldemo.util.Utils.prefixAllLines;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
