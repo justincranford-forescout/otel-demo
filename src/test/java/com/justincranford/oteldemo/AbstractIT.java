@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.client.RestTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,8 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @Accessors(fluent=true)
 @Slf4j
 public class AbstractIT {
-    static {
-        ContainerManager.initialize();
+    @DynamicPropertySource
+    static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws Exception {
+        ContainerManager.initialize(registry);
     }
 
     @Autowired

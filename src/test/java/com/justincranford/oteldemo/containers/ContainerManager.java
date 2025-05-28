@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -33,7 +32,7 @@ public class ContainerManager {
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = List.of(CONTAINER_OTEL_CONTRIB, CONTAINER_GRAFANA_LGTM);
 
-    public static void initialize() {
+    public static void initialize(final DynamicPropertyRegistry registry) throws JsonProcessingException {
         if (INITIALIZED.getAndSet(Boolean.TRUE)) {
             log.info("Test containers already initialized, skipping starting containers.");
             return;
@@ -87,30 +86,39 @@ public class ContainerManager {
                 }
             }
         }));
+
+        registerDynamicProperties(registry);
     }
 
-    // Spring Boot actuator properties: https://docs.spring.io/spring-boot/appendix/application-properties/index.html
-    @DynamicPropertySource
-    private static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws JsonProcessingException {
-        final Integer grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // GRPC port 4317 more efficient than HTTP port 4318
-        final Map<String, String> configMap = createOtelContribContainerProperties(grpcPort);
+    public static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws JsonProcessingException {
+        final Integer grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // GRPC port 4317;  more efficient than HTTP
+        final Integer httpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // HTTP port 4318
+        final Map<String, String> configMap = createOtelContribContainerProperties(grpcPort, httpPort);
 
         log.info("Spring Boot Actuator dynamic properties for otel-contrib testcontainer: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
         configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
     }
 
-    private static @NotNull Map<String, String> createOtelContribContainerProperties(Integer grpcPort) {
+    @SuppressWarnings({"unused"})
+    private static @NotNull Map<String, String> createOtelContribContainerProperties(final Integer grpcPort, final Integer httpPort) {
         final Map<String, String> configMap = new LinkedHashMap<>();
 
         /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0)
-        configMap.put("management.otlp.metrics.export.url", "http://localhost:" + grpcPort); // override port 4718 in application.properties
         configMap.put("management.otlp.metrics.export.step", "3s"); // override default 1ms in application.properties for quick testing
+        configMap.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
+//        configMap.put("management.otlp.metrics.export.url", "http://localhost:" + grpcPort);
 
         /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties] (since 3.4.0)
-        configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort); // override port 4718 in application.properties
+        configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
+        configMap.put("management.otlp.tracing.transport", "HTTP");
+//        configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort); // override port 4317 in application.properties
+//        configMap.put("management.otlp.tracing.transport", "GRPC");
 
         /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties] (since 3.4.0)
-        configMap.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort); // override port 4718 in application.properties
+        configMap.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
+        configMap.put("management.otlp.logging.transport", "HTTP");
+//        configMap.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort); // override port 4317 in application.properties
+//        configMap.put("management.otlp.logging.transport", "GRPC");
         return configMap;
     }
 
@@ -120,7 +128,7 @@ public class ContainerManager {
             if (CONTAINER_OTEL_CONTRIB.get() == null) {
                 final long nanosStart = System.nanoTime();
                 final String otelContribYamlFilePath = requireNonNull(CLASS_LOADER.getResource("otel-config.yaml")).getPath();
-                final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER).withNetworkAliases("otel-1").withExposedPorts(4317)
+                final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER).withNetworkAliases("otel-1").withExposedPorts(4317, 4318, 8888)
                         .withFileSystemBind(otelContribYamlFilePath, "/etc/otelcol-contrib/config.yaml", BindMode.READ_ONLY);
                 container.start(); // long blocking call
                 CONTAINER_OTEL_CONTRIB.set(container);
