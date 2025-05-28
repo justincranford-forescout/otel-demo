@@ -11,6 +11,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,19 +22,21 @@ import static java.util.Objects.requireNonNull;
 
 @Slf4j
 public class ContainerManager {
-    private static final Transport PREFERRED_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Micrometer limitation doesn't support GRPC Metrics (yet?)
+    private static final Transport PREFERRED_TRANSPORT = Transport.GRPC; // HTTP or GRPC; only affects Traces and Logs; Micrometer limitation doesn't support GRPC Metrics (yet?)
 
     private static final ClassLoader CLASS_LOADER = ContainerManager.class.getClassLoader();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final Duration TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START = Duration.ofSeconds(45);
-    private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER = DockerImageName.parse("otel/opentelemetry-collector:latest");
+    private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB = DockerImageName.parse("otel/opentelemetry-collector:latest");
     private static final DockerImageName DOCKER_IMAGE_NAME_GRAFANA_LGTM = DockerImageName.parse("grafana/otel-lgtm:latest");
 
     private static final AtomicReference<Boolean> INITIALIZED = new AtomicReference<>(Boolean.FALSE);
     public static final AtomicReference<GenericContainer<?>> CONTAINER_OTEL_CONTRIB = new AtomicReference<>(); // OpenTelemetry + Contrib
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = List.of(CONTAINER_OTEL_CONTRIB, CONTAINER_GRAFANA_LGTM);
+    private static final Integer[] CONTAINER_PORTS_OTEL_CONTRIB = {4317, 4318, 8888};
+    private static final Integer[] CONTAINER_PORTS_GRAFANA_LGTM = {3000};
 
     public static void initialize(final DynamicPropertyRegistry registry) throws JsonProcessingException {
         if (INITIALIZED.getAndSet(Boolean.TRUE)) {
@@ -113,7 +116,7 @@ public class ContainerManager {
         final Map<String, String> configMap = new LinkedHashMap<>();
 
         /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only transport (because Micrometer)
-        configMap.put("management.otlp.metrics.export.step", "2s"); // override default 1ms in application.properties for quick testing
+        configMap.put("management.otlp.metrics.export.step", "2s"); // fast for tests; default 1m too slow
         configMap.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
 
         /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties] (since 3.4.0) - HTTP or GRPC transport
@@ -141,17 +144,18 @@ public class ContainerManager {
             if (CONTAINER_OTEL_CONTRIB.get() == null) {
                 final long nanosStart = System.nanoTime();
                 final String otelContribYamlFilePath = requireNonNull(CLASS_LOADER.getResource("otel-config.yaml")).getPath();
-                final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER).withNetworkAliases("otel-1").withExposedPorts(4317, 4318, 8888)
+                final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB).withNetworkAliases("otel-1").withExposedPorts(CONTAINER_PORTS_OTEL_CONTRIB)
                         .withFileSystemBind(otelContribYamlFilePath, "/etc/otelcol-contrib/config.yaml", BindMode.READ_ONLY);
                 container.start(); // long blocking call
                 CONTAINER_OTEL_CONTRIB.set(container);
-                log.info("{} finished starting in {}", DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER, Duration.ofNanos(System.nanoTime() - nanosStart));
+                final List<String> mappedPorts = Arrays.stream(CONTAINER_PORTS_OTEL_CONTRIB).map(port -> port + ":" + container.getMappedPort(port)).toList();
+                log.info("{} started in {}, ports: {}", DOCKER_IMAGE_NAME_OTEL_CONTRIB, Duration.ofNanos(System.nanoTime() - nanosStart), mappedPorts);
             } else {
-                log.warn("{} is already started", DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER);
+                log.warn("{} already running", DOCKER_IMAGE_NAME_OTEL_CONTRIB);
             }
         });
-        otelContribThread.setName(DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER.toString());
-//        otelContribThread.setDaemon(true);
+        otelContribThread.setName(DOCKER_IMAGE_NAME_OTEL_CONTRIB.toString());
+        otelContribThread.setDaemon(true);
         otelContribThread.start();
         return otelContribThread;
     }
@@ -161,13 +165,14 @@ public class ContainerManager {
         final Thread grafanaThread = new Thread(() -> {
             if (CONTAINER_OTEL_CONTRIB.get() == null) {
                 final long nanosStart = System.nanoTime();
-                final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_GRAFANA_LGTM).withNetworkAliases("grafana-1").withExposedPorts(3000)
+                final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_GRAFANA_LGTM).withNetworkAliases("grafana-1").withExposedPorts(CONTAINER_PORTS_GRAFANA_LGTM)
                         .withEnv("GF_SECURITY_ADMIN_PASSWORD", "admin").withEnv("GF_SECURITY_ADMIN_USER", "admin");
                 container.start(); // long blocking call
                 CONTAINER_GRAFANA_LGTM.set(container);
-                log.info("{} finished starting in {}", DOCKER_IMAGE_NAME_GRAFANA_LGTM, Duration.ofNanos(System.nanoTime() - nanosStart));
+                final List<String> mappedPorts = Arrays.stream(CONTAINER_PORTS_GRAFANA_LGTM).map(port -> port + ":" + container.getMappedPort(port)).toList();
+                log.info("{} started in {}, ports: {}", DOCKER_IMAGE_NAME_GRAFANA_LGTM, Duration.ofNanos(System.nanoTime() - nanosStart), mappedPorts);
             } else {
-                log.warn("{} is already started", DOCKER_IMAGE_NAME_GRAFANA_LGTM);
+                log.warn("{} already running", DOCKER_IMAGE_NAME_GRAFANA_LGTM);
             }
         });
         grafanaThread.setName(DOCKER_IMAGE_NAME_GRAFANA_LGTM.toString());
