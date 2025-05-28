@@ -103,18 +103,17 @@ public class ContainerManager {
     private static @NotNull Map<String, String> createOtelContribContainerProperties(final Integer grpcPort, final Integer httpPort) {
         final Map<String, String> configMap = new LinkedHashMap<>();
 
-        /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0)
+        /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only transport (because Micrometer)
         configMap.put("management.otlp.metrics.export.step", "3s"); // override default 1ms in application.properties for quick testing
-//        configMap.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
-        configMap.put("management.otlp.metrics.export.url", "http://localhost:" + grpcPort);
+        configMap.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
 
-        /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties] (since 3.4.0)
+        /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties] (since 3.4.0) - HTTP or GRPC transport
 //        configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
 //        configMap.put("management.otlp.tracing.transport", "HTTP");
         configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort); // override port 4317 in application.properties
         configMap.put("management.otlp.tracing.transport", "GRPC");
 
-        /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties] (since 3.4.0)
+        /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties] (since 3.4.0) - HTTP or GRPC transport
 //        configMap.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
 //        configMap.put("management.otlp.logging.transport", "HTTP");
         configMap.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort); // override port 4317 in application.properties
