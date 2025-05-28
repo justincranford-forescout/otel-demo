@@ -1,6 +1,7 @@
 package com.justincranford.oteldemo;
 
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,18 @@ class HelloControllerIT extends AbstractIT {
     private static final long OTEL_PROMETHEUS_TOTAL_WAIT = 5_000L;
     private static final long OTEL_PROMETHEUS_INCREMENTAL_WAIT = 500L;
     private static final long OTEL_PROMETHEUS_MAX_REPEATS = SECURE_RANDOM.nextLong(1, 3); // 1-2 inclusive
+
+
+    @AfterAll
+    static void afterAll() {
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // Restore interrupted status
+            log.warn("Interrupted while waiting after all tests in HelloControllerIT");
+        }
+        log.info("After all tests in HelloControllerIT");
+    }
 
     @Test
     void testHelloApi_verifyBuiltInPrometheus_verifyOtelPrometheus() {
