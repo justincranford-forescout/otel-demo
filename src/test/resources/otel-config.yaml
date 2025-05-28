@@ -1,5 +1,5 @@
 receivers:
-  otlp:
+  otlp/fromSpringBootActuator:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
@@ -8,38 +8,46 @@ receivers:
 #  prometheus:
 #    config:
 #      scrape_configs:
-#        - job_name: 'otel-metrics-scrape'
+#        - job_name: 'scrape-prometheus'
 #          scrape_interval: 3s
 #          static_configs:
-#            - targets: ['localhost:8888']
+#            - targets: ['host.docker.internal:9090']
+
 processors:
   batch:
-    timeout: 5s
+    timeout: 3s
     send_batch_size: 50
     send_batch_max_size: 500
+
 exporters:
   debug:
     verbosity: detailed
+  otlp/toGrafanaLGTM:
+    endpoint: "host.docker.internal:4317" # If running in testcontainer, programmatically override port for otel container can reach grafana-lgtm container
+    tls:
+      insecure: true
   prometheus:
     endpoint: "0.0.0.0:8888"
+
 extensions:
   health_check: {}
   pprof:
     endpoint: 0.0.0.0:1777
   zpages:
     endpoint: 0.0.0.0:55679
+
 service:
   pipelines:
     metrics:
-      receivers: [otlp]
+      receivers: [otlp/fromSpringBootActuator]
       processors: [batch]
-      exporters: [debug, prometheus]
+      exporters: [debug, otlp/toGrafanaLGTM, prometheus]
     traces:
-      receivers: [otlp]
+      receivers: [otlp/fromSpringBootActuator]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlp/toGrafanaLGTM]
     logs:
-      receivers: [otlp]
+      receivers: [otlp/fromSpringBootActuator]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlp/toGrafanaLGTM]
   extensions: [health_check, pprof, zpages]
