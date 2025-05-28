@@ -5,14 +5,10 @@ import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCusto
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@Configuration(proxyBeanMethods = false)
+@Configuration
 public class MetricsConfiguration {
     @Bean
-    public MeterRegistryCustomizer<MeterRegistry> metricsCommonTags() {
-        return registry -> registry.config().commonTags(
-                "provider", "azure",
-                "region", "us-east-1",
-                "foo", "bar"
-        );
+    public MeterRegistryCustomizer<MeterRegistry> additionalTagsForMetricsOnly() {
+        return registry -> registry.config().commonTags("foo", "bar", "test1", "value1");
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static java.lang.Thread.sleep;
+
 @RestController
 @RequestMapping("/")
 @RequiredArgsConstructor
@@ -34,6 +36,13 @@ public class HelloController {
     @GetMapping("/hello")
     public String hello() {
         this.helloCounter.increment();
-        return this.observation.observe(() -> "Hello OpenTelemetry!");
+        return this.observation.observe(() -> {
+            try {
+                sleep(500); // Simulate some processing time
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // Restore interrupted status
+            }
+            return "Hello OpenTelemetry!";
+        });
     }
 }
