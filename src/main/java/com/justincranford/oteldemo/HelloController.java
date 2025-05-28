@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static com.justincranford.oteldemo.util.SecureRandomUtil.SECURE_RANDOM;
 import static java.lang.Thread.sleep;
 
 @RestController
@@ -38,7 +39,7 @@ public class HelloController {
         this.helloCounter.increment();
         return this.observation.observe(() -> {
             try {
-                sleep(500); // Simulate some processing time
+                sleep(SECURE_RANDOM.nextLong(1, 10)); // Simulate some processing time
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); // Restore interrupted status
             }
