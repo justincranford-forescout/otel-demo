@@ -19,7 +19,7 @@ class HelloControllerIT extends AbstractIT {
     private static final long INCREMENTAL_WAIT_MILLIS_PROMETHEUS_ACTUATOR = 100L;
     private static final long TOTAL_WAIT_MILLIS_PROMETHEUS_ACTUATOR = 2_000L;
     private static final long INCREMENTAL_WAIT_MILLIS_PROMETHEUS_OTEL = 500L;
-    private static final long TOTAL_WAIT_MILLIS_PROMETHEUS_OTEL = 10_000L;
+    private static final long TOTAL_WAIT_MILLIS_PROMETHEUS_OTEL = 5_000L;
 
     @Test
     void testHelloApi_verifyBuiltInPrometheus_verifyOtelPrometheus() {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.boot.actuate.autoconfigure.tracing.otlp.Transport;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
@@ -20,6 +21,8 @@ import static java.util.Objects.requireNonNull;
 
 @Slf4j
 public class ContainerManager {
+    private static final Transport PREFERRED_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Micrometer limitation doesn't support GRPC Metrics (yet?)
+
     private static final ClassLoader CLASS_LOADER = ContainerManager.class.getClassLoader();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -78,11 +81,17 @@ public class ContainerManager {
             for (final AtomicReference<GenericContainer<?>> containerReference : CONTAINER_REFERENCES) {
                 if (containerReference.get() == null) {
                     log.warn("Container reference is null.");
-                } else if (!containerReference.get().isRunning()) {
-                    log.info("Container is not running.");
                 } else {
-                    log.info("Container stopping...\n{}", prefixAllLines("CONTAINER", containerReference.get().getLogs()));
-                    containerReference.get().stop();
+                    final String containerName = containerReference.get().getDockerImageName();
+                    final String containerLogs = prefixAllLines(containerName, containerReference.get().getLogs());
+                    System.out.println(containerLogs);
+                    if (containerReference.get().isRunning()) {
+                        log.info("Container stopping...");
+                        containerReference.get().stop();
+                        log.info("Container stopped");
+                    } else {
+                        log.info("Container not running.");
+                    }
                 }
             }
         }));
@@ -104,20 +113,25 @@ public class ContainerManager {
         final Map<String, String> configMap = new LinkedHashMap<>();
 
         /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only transport (because Micrometer)
-        configMap.put("management.otlp.metrics.export.step", "3s"); // override default 1ms in application.properties for quick testing
+        configMap.put("management.otlp.metrics.export.step", "2s"); // override default 1ms in application.properties for quick testing
         configMap.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
 
         /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties] (since 3.4.0) - HTTP or GRPC transport
-//        configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
-//        configMap.put("management.otlp.tracing.transport", "HTTP");
-        configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort); // override port 4317 in application.properties
-        configMap.put("management.otlp.tracing.transport", "GRPC");
-
         /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties] (since 3.4.0) - HTTP or GRPC transport
-//        configMap.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
-//        configMap.put("management.otlp.logging.transport", "HTTP");
-        configMap.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort); // override port 4317 in application.properties
-        configMap.put("management.otlp.logging.transport", "GRPC");
+        configMap.put("management.otlp.tracing.transport", PREFERRED_TRANSPORT.name());
+        configMap.put("management.otlp.logging.transport", PREFERRED_TRANSPORT.name());
+        switch (PREFERRED_TRANSPORT) {
+            case HTTP:
+                configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
+                configMap.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
+                break;
+            case GRPC:
+                configMap.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort);
+                configMap.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort);
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported transport " + PREFERRED_TRANSPORT);
+        }
         return configMap;
     }
 
@@ -137,7 +151,7 @@ public class ContainerManager {
             }
         });
         otelContribThread.setName(DOCKER_IMAGE_NAME_OTEL_CONTRIB_CONTAINER.toString());
-        otelContribThread.setDaemon(true);
+//        otelContribThread.setDaemon(true);
         otelContribThread.start();
         return otelContribThread;
     }
