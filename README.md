@@ -1,9 +1,11 @@
-# Greenfield OTLP Demo: Spring Boot => OpenTelemetry => Grafana
+# Greenfield OTLP Demo: Spring Boot, OpenTelemetry, Grafana
 
 ## Description
-This is a demo of a Spring Boot REST application publishing Telemetry (x3) via OTLP to OpenTelemetry Collector, and forwarding to different vendor backends. Grafana Otel LGTM is used in this demo.
+The goal of this demo is to show a Spring Boot REST application publishing Telemetry (x3) via OTLP to OpenTelemetry Collector, and forwarding to at least one vendor-specific backend.
+If you want more background, jump to the [Background](#background) section at the end.
 
-## High-level Data Flow:
+## High-level Data Flow
+
 1. Spring Boot Actuator
    1. Micrometer
       1. OpenTelemetry SDK (OTLP Protocol)
@@ -14,48 +16,54 @@ This is a demo of a Spring Boot REST application publishing Telemetry (x3) via O
 
 ### OpenTelemetry Protocol (OTLP)
 
-OpenTelemetry Protocol (OTLP) is a vendor-neutral standard for collecting and transmitting telemetry data (traces, metrics, and logs) in distributed systems.
+OpenTelemetry Protocol (OTLP) is the Cloud Native Computing Foundation (CNCF) standard. See https://www.cncf.io/projects/opentelemetry/.
+
+OTLP is a vendor-neutral protocol for distributed systems to collect and transmit telemetry data (i.e. traces, metrics, and logs). See https://opentelemetry.io/docs/.
 
 ### Grafana Otel LGTM
 
-The LGTM in Grafana Otel LGTM has a double meaning.
+The LGTM in Grafana Otel LGTM has a double meaning. The common usage of LGTM is as an acronym in code reviews meaning `Looks Good To Me`.
 
-LGTM is most commonly used as an acronym in code reviews meaning `Looks Good To Me`.
-
-In Grafana, LGTM is an acronym for four different telemetry components bundled in a single container image for `non-prod` (e.g. `dev`, `stg`, `demo`):
+In Grafana, LGTM is an acronym for four different telemetry components bundled in a single container image:
 - `L`ogs (Loki) - Grafana logs database
 - `G`UI (Grafana) - Grafana UI
 - `M`etrics (Prometheus/Mimir) - Grafana metrics database
 - `T`races (Tempo) - Grafana traces database
 
-Grafana Pyroscope may also be used (for profiling), but the name is not included in the LGTM acronym.
+Grafana Otel LGTM is for `dev`, `stg`, and `demo` only. It is not intended for `prod` use.
 
 ## Spring Boot Versions & Limitations
 
-Spring Boot depends on Micrometer for OpenTelemetry support.
-
-Different versions of Spring Boot / Micrometer have different level of OTLP support.
+Spring Boot used Micrometer for OpenTelemetry support. Different pairs of Spring Boot / Micrometer versions have different levels of OTLP support.
 
 - **Micrometer OTLP Support**
   - **Metrics** => `Spring Boot 3.0.0+`
-    - HTTP only; GRPC still missing as of `Spring Boot 3.5.0`
+    - HTTP only; GRPC still not supported as of `Spring Boot 3.5.0`
   - **Traces** => `Spring Boot 3.4.0+`
     - HTTP and GRPC
   - **Logs** => `Spring Boot 3.4.0+`
     - HTTP and GRPC
 
+Both protocols (HTTP and GRPC) encode data using Google Protocol Buffers (protobuf).
+- GRPC is better for high-volume data transfer. It uses HTTP/2, and requires less CPU and memory.
+- HTTP is better for low-volume data transfer. It is also easier to debug, and more compatible with traditional load balancers and proxies.
+
+Example usage might be HTTP to OpenTelemetry Collector, then GRPC to Grafana Otel LGTM. That might help explain why Micrometer doesn't hack Metrics GRPC support (yet?).
+
 ## Telemetry Types & Data Flow Direction
+
+### Options
 
 - Logs: Push or Pull
 - Metrics: Push or Pull
-- Traces: Push
+- Traces: Push; no known pull options exist
 
-## Greenfield vs Brownfield
+### High-level Data Flow: Greenfield vs Brownfield
 
 - Greenfield: All push
-- Brownfield: Mixed; Metrics+Logs pull, Traces push
+- Brownfield: Traces push, Metrics+Logs fallback to traditional scrape/pull
 
-## Data Flow Detailed Options
+### Detailed Data Flow: All Options
 
 - Metrics
   - Push
@@ -72,21 +80,7 @@ Different versions of Spring Boot / Micrometer have different level of OTLP supp
       - OTLP GRPC (TCP/4317)
       - OTLP HTTP (TCP/4317)
   - Pull
-      - Console STDOUT/STDERR Scrape
-
-## External Links
-
-1. https://github.com/open-telemetry/opentelemetry-collector/blob/main/README.md
-    1. vendor-agnostic, and removes the need to run, operate and maintain multiple agents/collectors
-    2. image: https://hub.docker.com/r/otel/opentelemetry-collector/tags
-2. https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/README.md
-    1. extra components not available in the core collector, for example:
-        1. Extra receivers: Kubernetes, PostgreSQL, Redis, SNMP, etc
-        2. Extra exporters: Azure Monitor, GCP Trace, Elasticsearch, DataDog, Splunk, etc
-    2. image: https://hub.docker.com/r/otel/opentelemetry-collector-contrib/tags
-3. https://github.com/grafana/docker-otel-lgtm/blob/main/README.md
-    1. intended for development, demo, and testing environments
-    2. image: https://hub.docker.com/r/grafana/otel-lgtm/tags
+      - Container Console Scrape (STDOUT/STDERR)
 
 ## Background
 
@@ -107,3 +101,17 @@ The OpenTelemetry Collector can then forward some or all to multiple Observabili
 2. Elasticsearch (SIEM) => Retention 30d
 3. Honeycomb (Dev) => Retention 90d
 4. FluentBit (Log Aggregation) => Retention 365d
+
+## External Links
+
+1. https://github.com/open-telemetry/opentelemetry-collector/blob/main/README.md
+    1. vendor-agnostic, and removes the need to run, operate and maintain multiple agents/collectors
+    2. image: https://hub.docker.com/r/otel/opentelemetry-collector/tags
+2. https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/README.md
+    1. extra components not available in the core collector, for example:
+        1. Extra receivers: Kubernetes, PostgreSQL, Redis, SNMP, etc
+        2. Extra exporters: Azure Monitor, GCP Trace, Elasticsearch, DataDog, Splunk, etc
+    2. image: https://hub.docker.com/r/otel/opentelemetry-collector-contrib/tags
+3. https://github.com/grafana/docker-otel-lgtm/blob/main/README.md
+    1. intended for development, demo, and testing environments
+    2. image: https://hub.docker.com/r/grafana/otel-lgtm/tags
