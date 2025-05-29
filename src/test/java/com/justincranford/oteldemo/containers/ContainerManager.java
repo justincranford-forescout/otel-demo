@@ -162,7 +162,9 @@ public class ContainerManager {
                 final long nanosStart = System.nanoTime();
                 final String otelContribYamlFileOriginalPath = requireNonNull(CLASS_LOADER.getResource("otel-config.yaml")).getPath();
                 final String otelContribYamlFileOriginalContents = readFileContents(otelContribYamlFileOriginalPath, StandardCharsets.UTF_8);
-                final String otelContribYamlFileUpdatedContents = otelContribYamlFileOriginalContents.replace("host.docker.internal:4317", "host.docker.internal:" + grafanaLgtmGrpcPort);
+                final String otelContribYamlFileUpdatedContents = otelContribYamlFileOriginalContents
+                        .replace("host.docker.internal:4317", "host.docker.internal:" + grafanaLgtmGrpcPort)
+                        .replace("host.docker.internal:4318", "host.docker.internal:" + grafanaLgtmHttpPort);
                 final String otelContribYamlFileUpdatedPath = writeFileContents(otelContribYamlFileUpdatedContents);
                 final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB).withNetworkAliases("otel-1").withExposedPorts(CONTAINER_PORTS_OTEL_CONTRIB)
                         .withFileSystemBind(otelContribYamlFileUpdatedPath, "/etc/otelcol-contrib/config.yaml", BindMode.READ_ONLY);

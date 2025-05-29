@@ -1,29 +1,36 @@
 receivers:
-  otlp/fromSpringBootActuator:
+  otlp/fromSpringBootActuatorGrpc:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+  otlp/fromSpringBootActuatorHttp:
+    protocols:
       http:
         endpoint: 0.0.0.0:4318
-#  prometheus:
+#  prometheus/fromSpringBootActuatorPrometheus:
 #    config:
 #      scrape_configs:
 #        - job_name: 'scrape-prometheus'
 #          scrape_interval: 3s
 #          static_configs:
-#            - targets: ['host.docker.internal:9090']
+#            - targets: ['host.docker.internal:8080']
 
 processors:
   batch:
-    timeout: 3s
+    timeout: 5s
     send_batch_size: 50
     send_batch_max_size: 500
 
 exporters:
   debug:
+#    verbosity: basic
     verbosity: detailed
-  otlp/toGrafanaLGTM:
+  otlp/toGrafanaLGTMGrpc:
     endpoint: "host.docker.internal:4317" # If running in testcontainer, programmatically substitute with mapped port
+    tls:
+      insecure: true
+  otlp/toGrafanaLGTMHttp:
+    endpoint: "host.docker.internal:4318" # If running in testcontainer, programmatically substitute with mapped port
     tls:
       insecure: true
   prometheus:
@@ -39,15 +46,15 @@ extensions:
 service:
   pipelines:
     metrics:
-      receivers: [otlp/fromSpringBootActuator]
+      receivers: [otlp/fromSpringBootActuatorGrpc, otlp/fromSpringBootActuatorHttp]
       processors: [batch]
-      exporters: [debug, otlp/toGrafanaLGTM, prometheus]
+      exporters: [otlp/toGrafanaLGTMHttp]
     traces:
-      receivers: [otlp/fromSpringBootActuator]
+      receivers: [otlp/fromSpringBootActuatorGrpc, otlp/fromSpringBootActuatorHttp]
       processors: [batch]
-      exporters: [debug, otlp/toGrafanaLGTM]
+      exporters: [otlp/toGrafanaLGTMHttp]
     logs:
-      receivers: [otlp/fromSpringBootActuator]
+      receivers: [otlp/fromSpringBootActuatorGrpc, otlp/fromSpringBootActuatorHttp]
       processors: [batch]
-      exporters: [debug, otlp/toGrafanaLGTM]
+      exporters: [otlp/toGrafanaLGTMHttp]
   extensions: [health_check, pprof, zpages]
