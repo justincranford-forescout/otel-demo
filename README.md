@@ -16,7 +16,7 @@ If you want more background, jump to the [Background](#background) section at th
 
 ### OpenTelemetry Protocol (OTLP)
 
-OpenTelemetry Protocol (OTLP) is the Cloud Native Computing Foundation (CNCF) standard. See https://www.cncf.io/projects/opentelemetry/.
+OpenTelemetry Protocol (OTLP) is a Cloud Native Computing Foundation (CNCF) standard. See https://www.cncf.io/projects/opentelemetry/.
 
 OTLP is a vendor-neutral protocol for distributed systems to collect and transmit telemetry data (i.e. traces, metrics, and logs). See https://opentelemetry.io/docs/.
 
@@ -48,7 +48,7 @@ Both protocols (HTTP and GRPC) encode data using Google Protocol Buffers (protob
 - GRPC is better for high-volume data transfer. It uses HTTP/2, and requires less CPU and memory.
 - HTTP is better for low-volume data transfer. It is also easier to debug, and more compatible with traditional load balancers and proxies.
 
-Example usage might be HTTP to OpenTelemetry Collector, then GRPC to Grafana Otel LGTM. That might help explain why Micrometer doesn't hack Metrics GRPC support (yet?).
+Example usage might be HTTP to OpenTelemetry Collector, then GRPC to Grafana Otel LGTM. That might help explain why Micrometer doesn't support Metrics over GRPC (yet?).
 
 ## Telemetry Types & Data Flow Direction
 
