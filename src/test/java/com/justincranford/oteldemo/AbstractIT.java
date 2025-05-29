@@ -1,6 +1,7 @@
 package com.justincranford.oteldemo;
 
 import com.justincranford.oteldemo.containers.ContainerManager;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,12 @@ public class AbstractIT {
     @DynamicPropertySource
     static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws Exception {
         ContainerManager.initialize(registry);
+    }
+
+    protected static String BASE_URL = "";
+    @PostConstruct
+    void postConstruct() {
+        BASE_URL = this.baseUrl();
     }
 
     @Autowired

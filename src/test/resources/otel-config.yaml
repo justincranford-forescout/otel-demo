@@ -23,7 +23,7 @@ exporters:
   debug:
     verbosity: detailed
   otlp/toGrafanaLGTM:
-    endpoint: "host.docker.internal:4317" # If running in testcontainer, programmatically override port for otel container can reach grafana-lgtm container
+    endpoint: "host.docker.internal:4317" # If running in testcontainer, programmatically substitute with mapped port
     tls:
       insecure: true
   prometheus:

@@ -1,5 +1,6 @@
 package com.justincranford.oteldemo;
 
+import com.justincranford.oteldemo.containers.ContainerManager;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -10,15 +11,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
 import java.util.stream.LongStream;
 
-import static com.justincranford.oteldemo.containers.ContainerManager.CONTAINER_OTEL_CONTRIB;
+import static com.justincranford.oteldemo.containers.ContainerManager.*;
 import static com.justincranford.oteldemo.util.SecureRandomUtil.SECURE_RANDOM;
 import static com.justincranford.oteldemo.util.Utils.prefixAllLines;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
 class HelloControllerIT extends AbstractIT {
+    private static final boolean WAIT_BEFORE_EXIT = true; // Default false, change to true to wait before exiting after all tests
+
     private static final long ACTUATOR_HEALTH_TOTAL_WAIT = 2_000L;
     private static final long ACTUATOR_HEALTH_INCREMENTAL_WAIT = 100L;
     private static final long ACTUATOR_HEALTH_MAX_REPEATS = SECURE_RANDOM.nextLong(3, 6); // 3-5 inclusive
@@ -27,9 +31,9 @@ class HelloControllerIT extends AbstractIT {
     private static final long ACTUATOR_PROMETHEUS_INCREMENTAL_WAIT = 100L;
     private static final long ACTUATOR_PROMETHEUS_MAX_REPEATS = SECURE_RANDOM.nextLong(1, 2); // 1-2 inclusive
 
-    private static final long OTEL_PROMETHEUS_TOTAL_WAIT = 5_000L;
+    private static final long OTEL_PROMETHEUS_TOTAL_WAIT = 500L;
     private static final long OTEL_PROMETHEUS_INCREMENTAL_WAIT = 500L;
-    private static final long OTEL_PROMETHEUS_MAX_REPEATS = SECURE_RANDOM.nextLong(1, 3); // 1-2 inclusive
+    private static final long OTEL_PROMETHEUS_MAX_REPEATS = SECURE_RANDOM.nextLong(1, 2); // 1-1 inclusive
 
 
     @AfterAll
@@ -40,7 +44,41 @@ class HelloControllerIT extends AbstractIT {
             Thread.currentThread().interrupt(); // Restore interrupted status
             log.warn("Interrupted while waiting after all tests in HelloControllerIT");
         }
-        log.info("After all tests in HelloControllerIT");
+        final List<String> urlsWithMappedPorts = new java.util.ArrayList<>();
+        for (final String path : List.of(
+                "/actuator",
+                "/actuator/health",
+                "/actuator/metrics",
+                "/actuator/prometheus",
+                "/actuator/info",
+                "/actuator/env",
+                "/actuator/beans",
+                "/actuator/mappings",
+                "/actuator/loggers",
+                "/actuator/threaddump",
+                "/actuator/caches"
+        )) {
+            urlsWithMappedPorts.add(String.format("spring-boot-actuator: %s%s", BASE_URL, path));
+        }
+        for (final Integer port : CONTAINER_PORTS_OTEL_CONTRIB) {
+            urlsWithMappedPorts.add(String.format("otel-contrib %d:    http://localhost:%d/", port, CONTAINER_OTEL_CONTRIB.get().getMappedPort(port)));
+        }
+        for (final Integer port : CONTAINER_PORTS_GRAFANA_LGTM) {
+            urlsWithMappedPorts.add(String.format("grafana-lgtm %d:    http://localhost:%d/", port, ContainerManager.CONTAINER_GRAFANA_LGTM.get().getMappedPort(port)));
+        }
+        log.info("Summary after all tests:\n{}", String.join("\n", urlsWithMappedPorts));
+        if (WAIT_BEFORE_EXIT) {
+            log.info("Waiting for interrupt before exit...");
+            while (WAIT_BEFORE_EXIT) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.info("Interrupted.");
+                    break;
+                }
+            }
+        }
     }
 
     @Test

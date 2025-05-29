@@ -10,6 +10,11 @@ import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -35,8 +40,8 @@ public class ContainerManager {
     public static final AtomicReference<GenericContainer<?>> CONTAINER_OTEL_CONTRIB = new AtomicReference<>(); // OpenTelemetry + Contrib
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = List.of(CONTAINER_OTEL_CONTRIB, CONTAINER_GRAFANA_LGTM);
-    private static final Integer[] CONTAINER_PORTS_OTEL_CONTRIB = {4317, 4318, 8888};
-    private static final Integer[] CONTAINER_PORTS_GRAFANA_LGTM = {3000};
+    public static final Integer[] CONTAINER_PORTS_OTEL_CONTRIB = {4317, 4318, 8888};
+    public static final Integer[] CONTAINER_PORTS_GRAFANA_LGTM = {4317, 4318, 3000};
 
     public static void initialize(final DynamicPropertyRegistry registry) throws JsonProcessingException {
         if (INITIALIZED.getAndSet(Boolean.TRUE)) {
@@ -44,32 +49,14 @@ public class ContainerManager {
             return;
         }
 
-        final List<Thread> startContainerThreads = List.of(asyncStartContainerOtelContrib(), asyncStartContainerGrafanaLgtm());
+        // Group 1: grafana-lgtm
+        startContainersConcurrently(List.of(asyncStartContainerGrafanaLgtm())); // grafana-lgtm must start before otel-contrib
+        final Integer grafanaGrpcPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4317);
+        final Integer grafanaHttpPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4318);
 
-        final long millisStart = System.currentTimeMillis();
-        for (final Thread startContainerThread : startContainerThreads) {
-            if (startContainerThread.isAlive()) {
-                final long millisRemaining = TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START.toMillis() - (System.currentTimeMillis() - millisStart);
-                if (millisRemaining <= 0) {
-                    final String message = startContainerThread.getName() + " took too long to finish";
-                    log.error(message);
-                    startContainerThreads.stream().filter(Thread::isAlive).parallel().forEach(Thread::interrupt); // interrupt all remaining alive threads
-                    throw new RuntimeException(message);
-                }
-                try {
-                    startContainerThread.join(millisRemaining);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Interrupted while waiting for thread " + startContainerThread.getName() + " to end", e);
-                }
-                if (startContainerThread.isAlive()) {
-                    final String message = startContainerThread.getName() + " timed out waiting to finish";
-                    log.error(message);
-                    startContainerThreads.stream().filter(Thread::isAlive).parallel().forEach(Thread::interrupt); // interrupt all remaining alive threads
-                    throw new RuntimeException(message);
-                }
-            }
-        }
+        // Group 2: otel-contrib (depends on grafana-lgtm mapped port)
+        startContainersConcurrently(List.of(asyncStartContainerOtelContrib(grafanaGrpcPort, grafanaHttpPort)));
+
         for (final AtomicReference<GenericContainer<?>> containerReference : CONTAINER_REFERENCES) {
             if (containerReference.get() == null) {
                 log.error("Container reference is null after starting all containers.");
@@ -102,10 +89,37 @@ public class ContainerManager {
         registerDynamicProperties(registry);
     }
 
+    private static void startContainersConcurrently(final List<Thread> startContainerThreadsPhase1) {
+        final long millisStart = System.currentTimeMillis();
+        for (final Thread startContainerThread : startContainerThreadsPhase1) {
+            if (startContainerThread.isAlive()) {
+                final long millisRemaining = TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START.toMillis() - (System.currentTimeMillis() - millisStart);
+                if (millisRemaining <= 0) {
+                    final String message = startContainerThread.getName() + " took too long to finish";
+                    log.error(message);
+                    startContainerThreadsPhase1.stream().filter(Thread::isAlive).parallel().forEach(Thread::interrupt); // interrupt all remaining alive threads
+                    throw new RuntimeException(message);
+                }
+                try {
+                    startContainerThread.join(millisRemaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting for thread " + startContainerThread.getName() + " to end", e);
+                }
+                if (startContainerThread.isAlive()) {
+                    final String message = startContainerThread.getName() + " timed out waiting to finish";
+                    log.error(message);
+                    startContainerThreadsPhase1.stream().filter(Thread::isAlive).parallel().forEach(Thread::interrupt); // interrupt all remaining alive threads
+                    throw new RuntimeException(message);
+                }
+            }
+        }
+    }
+
     public static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws JsonProcessingException {
-        final Integer grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // GRPC port 4317;  more efficient than HTTP
-        final Integer httpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // HTTP port 4318
-        final Map<String, String> configMap = createOtelContribContainerProperties(grpcPort, httpPort);
+        final Integer otelGrpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // GRPC port 4317
+        final Integer otelHttpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // HTTP port 4318
+        final Map<String, String> configMap = createOtelContribContainerProperties(otelGrpcPort, otelHttpPort);
 
         log.info("Spring Boot Actuator dynamic properties for otel-contrib testcontainer: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
         configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
@@ -139,13 +153,19 @@ public class ContainerManager {
     }
 
     @SuppressWarnings({"resource"})
-    private static @NotNull Thread asyncStartContainerOtelContrib() {
+    private static @NotNull Thread asyncStartContainerOtelContrib(final Integer grafanaLgtmGrpcPort, final Integer grafanaLgtmHttpPort) {
+        if (grafanaLgtmGrpcPort == null || grafanaLgtmHttpPort == null) {
+            throw new IllegalArgumentException("Grafana GRPC and HTTP ports must be non-null");
+        }
         final Thread otelContribThread = new Thread(() -> {
             if (CONTAINER_OTEL_CONTRIB.get() == null) {
                 final long nanosStart = System.nanoTime();
-                final String otelContribYamlFilePath = requireNonNull(CLASS_LOADER.getResource("otel-config.yaml")).getPath();
+                final String otelContribYamlFileOriginalPath = requireNonNull(CLASS_LOADER.getResource("otel-config.yaml")).getPath();
+                final String otelContribYamlFileOriginalContents = readFileContents(otelContribYamlFileOriginalPath, StandardCharsets.UTF_8);
+                final String otelContribYamlFileUpdatedContents = otelContribYamlFileOriginalContents.replace("host.docker.internal:4317", "host.docker.internal:" + grafanaLgtmGrpcPort);
+                final String otelContribYamlFileUpdatedPath = writeFileContents(otelContribYamlFileUpdatedContents);
                 final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB).withNetworkAliases("otel-1").withExposedPorts(CONTAINER_PORTS_OTEL_CONTRIB)
-                        .withFileSystemBind(otelContribYamlFilePath, "/etc/otelcol-contrib/config.yaml", BindMode.READ_ONLY);
+                        .withFileSystemBind(otelContribYamlFileUpdatedPath, "/etc/otelcol-contrib/config.yaml", BindMode.READ_ONLY);
                 container.start(); // long blocking call
                 CONTAINER_OTEL_CONTRIB.set(container);
                 final List<String> mappedPorts = Arrays.stream(CONTAINER_PORTS_OTEL_CONTRIB).map(port -> port + ":" + container.getMappedPort(port)).toList();
@@ -158,6 +178,24 @@ public class ContainerManager {
         otelContribThread.setDaemon(true);
         otelContribThread.start();
         return otelContribThread;
+    }
+
+    private static String readFileContents(String otelContribYamlFilePath, final Charset charset) {
+        try {
+            return Files.readString(Path.of(otelContribYamlFilePath), charset);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static String writeFileContents(String otelContribYamlFileUpdatedContents) {
+        try {
+            final Path tempOtelConfig = Files.createTempFile("otel-config-", ".yaml");
+            Files.writeString(tempOtelConfig, otelContribYamlFileUpdatedContents, StandardCharsets.UTF_8);
+            return tempOtelConfig.toString();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @SuppressWarnings({"resource"})
