@@ -65,22 +65,22 @@ Example usage might be HTTP to OpenTelemetry Collector, then GRPC to Grafana Ote
 
 ### Detailed Data Flow: All Options
 
+- Logs
+  - Push
+    - OTLP GRPC (TCP/4317)
+    - OTLP HTTP (TCP/4318)
+  - Pull
+    - Container Console Scrape (STDOUT/STDERR)
 - Metrics
   - Push
     - OTLP GRPC (TCP/4317)
-    - OTLP HTTP (TCP/4317)
+    - OTLP HTTP (TCP/4318)
   - Pull
     - Prometheus Endpoint Scrape (TCP/9090)
 - Traces
   - Push
     - OTLP GRPC (TCP/4317)
-    - OTLP HTTP (TCP/4317)
-- Logs
-  - Push
-      - OTLP GRPC (TCP/4317)
-      - OTLP HTTP (TCP/4317)
-  - Pull
-      - Container Console Scrape (STDOUT/STDERR)
+    - OTLP HTTP (TCP/4318)
 
 ## Background
 
