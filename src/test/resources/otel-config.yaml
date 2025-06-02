@@ -7,13 +7,20 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
-#  prometheus/httpScrapeReceiver:
+#  receiver/prometheus/externalAppScrape:
 #    config:
 #      scrape_configs:
-#        - job_name: 'scrape-prometheus'
+#        - job_name: 'external-app-prometheus-scrape'
 #          scrape_interval: 3s
 #          static_configs:
 #            - targets: ['host.docker.internal:8080']
+  receiver/prometheus/otelContribScrape:
+    config:
+      scrape_configs:
+        - job_name: 'otel-self-prometheus-scrape'
+          scrape_interval: 3s
+          static_configs:
+            - targets: ['localhost:8888']
 
 processors:
   batch:
@@ -60,7 +67,7 @@ service:
       processors: [batch]
       exporters: [exporter/debug, exporter/grafanaLGTM/tempoOTLP/HTTP]
     metrics:
-      receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP]
+      receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP, receiver/prometheus/otelContribScrape]
       processors: [batch]
       exporters: [exporter/debug, exporter/grafanaLGTM/prometheusProprietary/Push]
   extensions: [health_check, pprof, zpages]
