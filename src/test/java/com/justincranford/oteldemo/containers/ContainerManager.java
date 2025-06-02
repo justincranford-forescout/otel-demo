@@ -121,7 +121,12 @@ public class ContainerManager {
                 final String otelContribYamlFileOriginalPath = requireNonNull(CLASS_LOADER.getResource("otel-config.yaml")).getPath();
                 final String otelContribYamlFileOriginalContents = readFileContents(otelContribYamlFileOriginalPath, StandardCharsets.UTF_8);
                 final AtomicReference<String> otelContribYamlFileUpdatedContents = new AtomicReference<>(otelContribYamlFileOriginalContents);
+                grafanaLgtmMappedPorts.forEach((internalPort, mappedPort) -> otelContribYamlFileUpdatedContents.set(
+                        otelContribYamlFileUpdatedContents.get().replace("host.docker.internal:" + internalPort, "host.docker.internal:" + mappedPort)
+                ));
                 final String otelContribYamlFileUpdatedPath = writeFileContents(otelContribYamlFileUpdatedContents.get());
+                log.info("Updated otel-config.yaml:\n{}", prefixAllLines("otel-config.yaml", otelContribYamlFileUpdatedContents.get())); // use STDOUT in case slf4j is shut down
+
                 final GenericContainer<?> container = new GenericContainer<>(DOCKER_IMAGE_NAME_OTEL_CONTRIB).withNetworkAliases("otel-1").withExposedPorts(CONTAINER_PORTS_OTEL_CONTRIB)
                         .withFileSystemBind(otelContribYamlFileUpdatedPath, "/etc/otelcol-contrib/config.yaml", BindMode.READ_ONLY);
                 container.start(); // long blocking call
