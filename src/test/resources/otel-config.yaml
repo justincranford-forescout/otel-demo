@@ -1,13 +1,13 @@
 receivers:
-  otlp/grpcReceiverSpringBootActuator:
+  receiver/OTLP/springBootActuator/GRPC:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
-  otlp/httpReceiverSpringBootActuator:
+  receiver/OTLP/springBootActuator/HTTP:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
-#  prometheus/fromSpringBootActuatorPrometheus:
+#  prometheus/httpScrapeReceiver:
 #    config:
 #      scrape_configs:
 #        - job_name: 'scrape-prometheus'
@@ -22,19 +22,25 @@ processors:
     send_batch_max_size: 500
 
 exporters:
-  debug:
+  exporter/debug:
 #    verbosity: basic
     verbosity: detailed
-  otlp/grpcExporterGrafanaOtelLgtm:
-    endpoint: "host.docker.internal:4317" # If running in testcontainer, programmatically substitute with mapped port
+  exporter/grafanaLGTM/lokiProprietary:
+    endpoint: "http://host.docker.internal:3100/loki/api/v1/push" # If running in testcontainer, programmatically substitute with mapped port
     tls:
       insecure: true
-  otlp/httpExporterGrafanaOtelLgtm:
-    endpoint: "host.docker.internal:4318" # If running in testcontainer, programmatically substitute with mapped port
+  exporter/grafanaLGTM/tempoOTLP/GRPC:
+    endpoint: "http://host.docker.internal:4317" # If running in testcontainer, programmatically substitute with mapped port
     tls:
       insecure: true
-  prometheus:
-    endpoint: "0.0.0.0:8888"
+  exporter/grafanaLGTM/tempoOTLP/HTTP:
+    endpoint: "http://host.docker.internal:4318" # If running in testcontainer, programmatically substitute with mapped port
+    tls:
+      insecure: true
+  exporter/grafanaLGTM/prometheusProprietary/Push:
+    endpoint: "http://host.docker.internal:9090/api/v1/otlp/v1/metrics" # If running in testcontainer, programmatically substitute with mapped port
+    tls:
+      insecure: true
 
 extensions:
   health_check: {}
@@ -45,19 +51,16 @@ extensions:
 
 service:
   pipelines:
-    metrics:
-      receivers: [otlp/grpcReceiverSpringBootActuator, otlp/httpReceiverSpringBootActuator]
-      processors: [batch]
-#      exporters: [debug, otlp/grpcExporterGrafanaOtelLgtm]
-      exporters: [debug, otlp/httpExporterGrafanaOtelLgtm]
-    traces:
-      receivers: [otlp/grpcReceiverSpringBootActuator, otlp/httpReceiverSpringBootActuator]
-      processors: [batch]
-#      exporters: [debug, otlp/grpcExporterGrafanaOtelLgtm]
-      exporters: [debug, otlp/httpExporterGrafanaOtelLgtm]
     logs:
-      receivers: [otlp/grpcReceiverSpringBootActuator, otlp/httpReceiverSpringBootActuator]
+      receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP]
       processors: [batch]
-#      exporters: [debug, otlp/grpcExporterGrafanaOtelLgtm]
-      exporters: [debug, otlp/httpExporterGrafanaOtelLgtm]
+      exporters: [exporter/debug, exporter/grafanaLGTM/lokiProprietary]
+    traces:
+      receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP]
+      processors: [batch]
+      exporters: [exporter/debug, exporter/grafanaLGTM/tempoOTLP/HTTP]
+    metrics:
+      receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP]
+      processors: [batch]
+      exporters: [exporter/debug, exporter/grafanaLGTM/prometheusProprietary/Push]
   extensions: [health_check, pprof, zpages]
