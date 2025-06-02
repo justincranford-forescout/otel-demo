@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @Getter
 @Accessors(fluent=true)
 @Slf4j
-public class AbstractIT {
+public abstract class AbstractIT {
     @DynamicPropertySource
     static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws Exception {
         ContainerManager.initialize(registry);
