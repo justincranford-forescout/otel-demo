@@ -1,7 +1,7 @@
 package com.justincranford.oteldemo;
 
 import com.justincranford.oteldemo.containers.ContainerManager;
-import jakarta.annotation.PostConstruct;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
@@ -9,18 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationContext;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.web.client.RestTemplate;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles({"test", "default"})
@@ -33,14 +25,11 @@ public abstract class AbstractIT {
         ContainerManager.initialize(registry);
     }
 
-    protected static String BASE_URL = "";
-    @PostConstruct
-    void postConstruct() {
-        BASE_URL = this.baseUrl();
-    }
-
     @Autowired
     private ApplicationContext applicationContext;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @Value("${server.address:localhost}")
     private String serverAddress;
@@ -50,16 +39,5 @@ public abstract class AbstractIT {
 
     protected String baseUrl() {
         return "http://" + this.serverAddress() + ":" + this.localServerPort();
-    }
-
-    protected String doHttpGet(final String url) {
-        log.info("Getting URL {}", url);
-        final RestTemplate restTemplate = new RestTemplateBuilder().build();
-        final ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
-        final HttpStatusCode statusCode = responseEntity.getStatusCode();
-        final String responseBody = responseEntity.getBody();
-        assertEquals(HttpStatus.OK, statusCode);
-        assertNotNull(responseBody);
-        return responseBody;
     }
 }
