@@ -30,24 +30,24 @@ processors:
 
 exporters:
   exporter/debug:
-#    verbosity: basic
-    verbosity: detailed
-  exporter/grafanaLGTM/lokiProprietary:
-    endpoint: "http://host.docker.internal:3100/loki/api/v1/push" # If running in testcontainer, programmatically substitute with mapped port
-    tls:
-      insecure: true
-  exporter/grafanaLGTM/tempoOTLP/GRPC:
-    endpoint: "http://host.docker.internal:4317" # If running in testcontainer, programmatically substitute with mapped port
-    tls:
-      insecure: true
-  exporter/grafanaLGTM/tempoOTLP/HTTP:
+    verbosity: basic
+#    verbosity: detailed
+#  exporter/grafanaLGTM/lokiProprietary:
+#    endpoint: "http://host.docker.internal:3100/loki/api/v1/push" # If running in testcontainer, programmatically substitute with mapped port
+#    tls:
+#      insecure: true
+#  exporter/grafanaLGTM/GRPC:
+#    endpoint: "http://host.docker.internal:4317" # If running in testcontainer, programmatically substitute with mapped port
+#    tls:
+#      insecure: true
+  exporter/grafanaLGTM/HTTP:
     endpoint: "http://host.docker.internal:4318" # If running in testcontainer, programmatically substitute with mapped port
     tls:
       insecure: true
-  exporter/grafanaLGTM/prometheusProprietary/Push:
-    endpoint: "http://host.docker.internal:9090/api/v1/otlp/v1/metrics" # If running in testcontainer, programmatically substitute with mapped port
-    tls:
-      insecure: true
+#  exporter/grafanaLGTM/prometheusProprietary/Push:
+#    endpoint: "http://host.docker.internal:9009/api/v1/otlp/v1/metrics" # If running in testcontainer, programmatically substitute with mapped port
+#    tls:
+#      insecure: true
 
 extensions:
   health_check: {}
@@ -61,13 +61,13 @@ service:
     logs:
       receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP]
       processors: [batch]
-      exporters: [exporter/debug, exporter/grafanaLGTM/lokiProprietary]
+      exporters: [exporter/debug, exporter/grafanaLGTM/HTTP]
     traces:
       receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP]
       processors: [batch]
-      exporters: [exporter/debug, exporter/grafanaLGTM/tempoOTLP/HTTP]
+      exporters: [exporter/debug, exporter/grafanaLGTM/HTTP]
     metrics:
       receivers: [receiver/OTLP/springBootActuator/GRPC, receiver/OTLP/springBootActuator/HTTP, receiver/prometheus/otelContribScrape]
       processors: [batch]
-      exporters: [exporter/debug, exporter/grafanaLGTM/prometheusProprietary/Push]
+      exporters: [exporter/debug, exporter/grafanaLGTM/HTTP]
   extensions: [health_check, pprof, zpages]

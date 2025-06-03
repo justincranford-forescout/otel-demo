@@ -28,8 +28,11 @@ repositories {
 
 dependencyManagement {
 	imports {
-		// https://mvnrepository.com/artifact/org.testcontainers/testcontainers-bom/1.21.0
-		mavenBom 'org.testcontainers:testcontainers-bom:1.21.0'
+		// https://mvnrepository.com/artifact/io.opentelemetry.instrumentation/opentelemetry-instrumentation-bom/2.16.0
+		mavenBom 'io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:2.16.0'
+
+		// https://mvnrepository.com/artifact/org.testcontainers/testcontainers-bom/1.21.1
+		mavenBom 'org.testcontainers:testcontainers-bom:1.21.1'
 	}
 }
 
@@ -46,9 +49,11 @@ dependencies {
 	implementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'io.micrometer:micrometer-registry-otlp'
 	implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+	implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.16.0-alpha'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation "org.testcontainers:grafana"
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
