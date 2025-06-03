@@ -1,0 +1,62 @@
+plugins {
+	id 'java'
+
+	// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot
+//	id 'org.springframework.boot' version '3.5.0'
+	id 'org.springframework.boot' version '3.4.6'
+//	id 'org.springframework.boot' version '3.3.12'
+//	id 'org.springframework.boot' version '3.2.12'
+//	id 'org.springframework.boot' version '3.1.12'
+//	id 'org.springframework.boot' version '3.0.7'
+
+	// https://mvnrepository.com/artifact/io.spring.dependency-management/io.spring.dependency-management.gradle.plugin
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.justincranford'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencyManagement {
+	imports {
+		// https://mvnrepository.com/artifact/io.opentelemetry.instrumentation/opentelemetry-instrumentation-bom/2.16.0
+		mavenBom 'io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:2.16.0'
+
+		// https://mvnrepository.com/artifact/org.testcontainers/testcontainers-bom/1.21.1
+		mavenBom 'org.testcontainers:testcontainers-bom:1.21.1'
+	}
+}
+
+dependencies {
+	compileOnly("org.projectlombok:lombok")
+	annotationProcessor("org.projectlombok:lombok")
+	testCompileOnly("org.projectlombok:lombok")
+	testAnnotationProcessor("org.projectlombok:lombok")
+
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+
+	implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+	implementation 'io.micrometer:micrometer-registry-otlp'
+	implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+	implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.16.0-alpha'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation "org.testcontainers:grafana"
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
