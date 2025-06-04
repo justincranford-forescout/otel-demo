@@ -32,7 +32,7 @@ public class ContainerManager {
     private static final DockerImageName DOCKER_IMAGE_NAME_GRAFANA_LGTM = DockerImageName.parse("grafana/otel-lgtm:latest");
     private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB = DockerImageName.parse("otel/opentelemetry-collector:latest");
 
-    private static final boolean SPRING_BOOT_OTLP_SEND_TO_OTELCOL = true;
+    private static final boolean SPRING_BOOT_OTLP_SEND_TO_OTELCOL = false; // true=otelcol, false=grafana-lgtm
     private static final Transport SPRING_BOOT_OTLP_PREFERRED_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Metrics GRPC is missing (Micrometer limitation)
 
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
