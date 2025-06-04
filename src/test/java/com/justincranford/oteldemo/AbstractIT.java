@@ -15,7 +15,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles({"test", "default"})
+@ActiveProfiles({"test", "default", "livedemo"})
 @Getter
 @Accessors(fluent=true)
 @Slf4j

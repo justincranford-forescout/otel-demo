@@ -4,8 +4,11 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.web.client.RestTemplate;
 
@@ -17,25 +20,12 @@ import static com.justincranford.oteldemo.util.Utils.printUrlsWithMappedPorts;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @Slf4j
-class OteldemoApplicationIT extends AbstractIT {
-    private static final boolean WAIT_FOR_EXIT = true; // Default false, change to true to wait before exiting after all tests
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+class GenerateTelemetryDataIT extends AbstractIT {
+    @Value("${otel.demo.livedemo:false}")
+    private boolean livedemo;
 
-    @AfterAll
-    static void afterAll() {
-        if (WAIT_FOR_EXIT) {
-            log.info("Waiting for interrupt before exiting...");
-            while (true) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.info("Interrupted. Exiting...");
-                    break;
-                }
-            }
-        }
-    }
-
+    @Order(Integer.MIN_VALUE)
     @Test
     void printUrls() {
         assertDoesNotThrow(() -> printUrlsWithMappedPorts(super.baseUrl()));
@@ -77,6 +67,23 @@ class OteldemoApplicationIT extends AbstractIT {
         final String url = super.baseUrl() + "/hello";
         final RestTemplate restTemplate = new RestTemplateBuilder().build();
         doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 500, 1000, "get " + url);
+    }
+
+    @Order(Integer.MAX_VALUE)
+    @Test
+    void generateOpenTelemetryOTLPTrafficForCustomControllerMetrics() {
+        if (livedemo) {
+            log.info("Waiting for interrupt before exiting...");
+            while (true) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.info("Interrupted. Exiting...");
+                    break;
+                }
+            }
+        }
     }
 
     private static void doLoopInThread(final LongConsumer loopBody, final int minWait, final int maxWait, final String thing) {
