@@ -1,5 +1,6 @@
-package com.justincranford.oteldemo;
+package com.justincranford.oteldemo.zzz;
 
+import com.justincranford.oteldemo.AbstractIT;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
@@ -8,23 +9,21 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.function.LongConsumer;
 
-import static com.justincranford.oteldemo.Constants.ACTUATOR_ENDPOINTS;
+import static com.justincranford.oteldemo.actuator.Constants.ACTUATOR_ENDPOINTS;
+import static com.justincranford.oteldemo.containers.ContainerUtil.printUrlsWithMappedPorts;
 import static com.justincranford.oteldemo.util.SecureRandomUtil.SECURE_RANDOM;
-import static com.justincranford.oteldemo.util.Utils.printUrlsWithMappedPorts;
+import static com.justincranford.oteldemo.util.SleepUtil.waitMillis;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @Slf4j
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class GenerateTelemetryDataIT extends AbstractIT {
-    @Value("${otel.demo.livedemo:false}")
-    private boolean livedemo;
-
     @Order(Integer.MIN_VALUE)
     @Test
     void printUrls() {
@@ -77,36 +76,30 @@ class GenerateTelemetryDataIT extends AbstractIT {
 
     @Order(Integer.MAX_VALUE)
     @Test
-    void livedemo() {
-        log.info("livedemo: {}", livedemo);
-        if (this.livedemo) {
-            log.info("Waiting for interrupt before exiting...");
-            while (true) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.info("Interrupted. Exiting...");
-                    break;
-                }
-            }
+    void liveDemo() {
+        log.info("livedemo: {}", super.livedemo());
+        if (super.livedemo()) {
+            doLoop(currentIteration -> {}, 10000, 20000, "Livedemo");
         }
     }
 
-    private static void doLoopInThread(final LongConsumer loopBody, final int minWait, final int maxWait, final String thing) {
-        final Thread logThread = new Thread(() -> {
-            for (long currentIteration = 1; currentIteration < Long.MAX_VALUE; currentIteration++) {
-                try {
-                    loopBody.accept(currentIteration);
-                    Thread.sleep(SECURE_RANDOM.nextInt(minWait, maxWait));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt(); // Restore interrupted status
-                    log.warn("Interrupted {} after {}", thing, currentIteration);
-                    break;
-                }
-            }
-        });
-        logThread.setDaemon(true); // Don't block JVM exit
+    private static void doLoopInThread(final LongConsumer loopBody, final int minMillis, final int maxMillis, final String thing) {
+        assertThat(loopBody).isNotNull();
+        assertThat(minMillis).isGreaterThanOrEqualTo(1);
+        assertThat(maxMillis).isGreaterThan(minMillis); // can't be same or lower than minMillis
+        assertThat(thing).isNotBlank();
+
+        final Thread logThread = new Thread(() -> doLoop(loopBody, minMillis, maxMillis, thing));
+        logThread.setName("doLoopInThread " + thing);
+        logThread.setDaemon(true);
         logThread.start();
+    }
+
+    private static void doLoop(LongConsumer loopBody, int minMillis, int maxMillis, String thing) {
+        for (long currentIteration = 1; currentIteration < Long.MAX_VALUE; currentIteration++) {
+            log.info("{} iteration {}", thing, currentIteration);
+            loopBody.accept(currentIteration);
+            waitMillis(thing + " " + currentIteration, SECURE_RANDOM.nextInt(minMillis, maxMillis));
+        }
     }
 }

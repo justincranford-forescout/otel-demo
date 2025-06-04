@@ -15,7 +15,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles({"test", "default", "livedemo"})
+@ActiveProfiles({"livedemo", "test", "otel", "default"})
 @Getter
 @Accessors(fluent=true)
 @Slf4j
@@ -24,6 +24,9 @@ public abstract class AbstractIT {
     static void registerDynamicProperties(final DynamicPropertyRegistry registry) throws Exception {
         ContainerManager.initialize(registry);
     }
+
+    @Value("${otel.demo.livedemo:false}")
+    private boolean livedemo;
 
     @Autowired
     private ApplicationContext applicationContext;

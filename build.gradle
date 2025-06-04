@@ -55,6 +55,7 @@ dependencies {
 	testImplementation 'org.testcontainers:junit-jupiter'
 	testImplementation "org.testcontainers:grafana"
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+//	testRuntimeOnly 'com.azure.spring:spring-cloud-azure-starter-monitor:5.22.0'
 }
 
 tasks.named('test') {

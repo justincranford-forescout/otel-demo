@@ -20,7 +20,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.justincranford.oteldemo.containers.ContainerUtil.getMappedPorts;
 import static com.justincranford.oteldemo.containers.ContainerUtil.startContainersConcurrently;
-import static com.justincranford.oteldemo.util.Utils.*;
+import static com.justincranford.oteldemo.util.FileUtil.prefixAllLines;
+import static com.justincranford.oteldemo.util.FileUtil.readFileContents;
+import static com.justincranford.oteldemo.util.FileUtil.writeFileContents;
 import static java.util.Objects.requireNonNull;
 
 @Slf4j

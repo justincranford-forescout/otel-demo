@@ -3,7 +3,7 @@ package com.justincranford.oteldemo;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 
-import static com.justincranford.oteldemo.util.Utils.doHttpGet;
+import static com.justincranford.oteldemo.util.HttpUtil.doHttpGet;
 
 @Slf4j
 class PrometheusIT extends AbstractIT {

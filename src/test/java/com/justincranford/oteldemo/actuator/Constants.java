@@ -1,4 +1,4 @@
-package com.justincranford.oteldemo;
+package com.justincranford.oteldemo.actuator;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
