@@ -2,7 +2,7 @@
 <configuration>
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS}[%-5.5level][%-30.30thread][%-40.40logger{39}] %message [%kvp{DOUBLE}]%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS}[%-5.5level][%-30.30thread][%-40.40logger{39}][%kvp{DOUBLE}] %message%n</pattern>
         </encoder>
     </appender>
     <!-- See README.md at https://github.com/open-telemetry/opentelemetry-java-instrumentation/tree/main/instrumentation/logback/logback-appender-1.0/library -->
