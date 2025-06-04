@@ -27,15 +27,15 @@ import static java.util.Objects.requireNonNull;
 
 @Slf4j
 public class ContainerManager {
+    private static final boolean SEND_TO_OTELCOL = false; // true=otelcol, false=grafana-lgtm
+    private static final Transport OTLP_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Metrics GRPC is missing (Micrometer limitation)
+
     private static final ClassLoader CLASS_LOADER = ContainerManager.class.getClassLoader();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final Duration TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START = Duration.ofSeconds(45);
     private static final DockerImageName DOCKER_IMAGE_NAME_GRAFANA_LGTM = DockerImageName.parse("grafana/otel-lgtm:latest");
     private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB = DockerImageName.parse("otel/opentelemetry-collector:latest");
-
-    private static final boolean SPRING_BOOT_OTLP_SEND_TO_OTELCOL = false; // true=otelcol, false=grafana-lgtm
-    private static final Transport SPRING_BOOT_OTLP_PREFERRED_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Metrics GRPC is missing (Micrometer limitation)
 
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     public static final Integer[] CONTAINER_PORTS_GRAFANA_LGTM = {3000, 4317, 4318, 3200, 9090}; // 3000=Grafana, 4317=OTLP GRPC, 4318=OTLP HTTP, 3200=Tempo, 9090=Prometheus
@@ -158,7 +158,7 @@ public class ContainerManager {
     private static @NotNull Map<String, String> createOtelContribContainerProperties() {
         final Integer grpcPort;
         final Integer httpPort;
-        if (SPRING_BOOT_OTLP_SEND_TO_OTELCOL) {
+        if (SEND_TO_OTELCOL) {
             httpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // Grafana Otel OTLP - HTTP port 4318
             grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // Grafana Otel OTLP - GRPC port 4317
         } else {
@@ -169,7 +169,7 @@ public class ContainerManager {
         final Map<String, String> otelContribDynamicProperties = new LinkedHashMap<>();
         otelContribDynamicProperties.put("management.otlp.metrics.export.step", "2s"); // default 1m is too slow for tests; make it faster for tests
         otelContribDynamicProperties.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
-        switch (SPRING_BOOT_OTLP_PREFERRED_TRANSPORT) {
+        switch (OTLP_TRANSPORT) {
             case HTTP:
                 otelContribDynamicProperties.put("management.otlp.logging.transport", "HTTP");
                 otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
@@ -183,7 +183,7 @@ public class ContainerManager {
                 otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort);
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported transport " + SPRING_BOOT_OTLP_PREFERRED_TRANSPORT);
+                throw new IllegalArgumentException("Unsupported transport " + OTLP_TRANSPORT);
         }
         return otelContribDynamicProperties;
     }
