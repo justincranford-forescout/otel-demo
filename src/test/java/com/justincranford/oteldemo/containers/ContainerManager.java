@@ -32,12 +32,14 @@ public class ContainerManager {
     private static final DockerImageName DOCKER_IMAGE_NAME_GRAFANA_LGTM = DockerImageName.parse("grafana/otel-lgtm:latest");
     private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB = DockerImageName.parse("otel/opentelemetry-collector:latest");
 
+    private static final boolean SPRING_BOOT_OTLP_SEND_TO_OTELCOL = true;
+    private static final Transport SPRING_BOOT_OTLP_PREFERRED_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Metrics GRPC is missing (Micrometer limitation)
+
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     public static final Integer[] CONTAINER_PORTS_GRAFANA_LGTM = {3000, 4317, 4318, 3200, 9090}; // 3000=Grafana, 4317=OTLP GRPC, 4318=OTLP HTTP, 3200=Tempo, 9090=Prometheus
 
     public static final AtomicReference<GenericContainer<?>> CONTAINER_OTEL_CONTRIB = new AtomicReference<>(); // OpenTelemetry + Contrib
-    public static final Integer[] CONTAINER_PORTS_OTEL_CONTRIB = {4317, 4318, 8888}; // 4317=GRPC, 4318=HTTP, 8888=Metrics (Prometheus)
-    private static final Transport CONTAINER_OTEL_CONTRIB_PREFERRED_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Micrometer limitation doesn't support GRPC Metrics (yet?)
+    public static final Integer[] CONTAINER_PORTS_OTEL_CONTRIB = {4317, 4318, 8888, 1777, 55679}; // 4317=GRPC, 4318=HTTP, 8888=Metrics (Prometheus), 1777=pprof, 55679=zpages
 
     private static final AtomicReference<Boolean> INITIALIZED = new AtomicReference<>(Boolean.FALSE);
     private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = List.of(CONTAINER_GRAFANA_LGTM, CONTAINER_OTEL_CONTRIB);
@@ -48,12 +50,12 @@ public class ContainerManager {
             return;
         }
 
-        // Group 1: grafana-lgtm (must start before otel-contrib)
+        // Group 1: grafana-lgtm (must start before otelcol)
         startContainersConcurrently(List.of(asyncStartContainerGrafanaLgtm()), TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START);
         final Map<Integer, Integer> grafanaLgtmMappedPorts = getMappedPorts(CONTAINER_GRAFANA_LGTM.get(), CONTAINER_PORTS_GRAFANA_LGTM);
         log.info("{}, mapped ports: {}", CONTAINER_GRAFANA_LGTM, grafanaLgtmMappedPorts);
 
-        // Group 2: otel-contrib (must start after grafana-lgtm, because it will export telemetry through the mapped ports of grafana-lgtm)
+        // Group 2: otelcol (must start after grafana-lgtm, because it will export telemetry through the mapped ports of grafana-lgtm)
         startContainersConcurrently(List.of(asyncStartContainerOtelContrib(grafanaLgtmMappedPorts)), TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START);
         final Map<Integer, Integer> otelContribMappedPorts = getMappedPorts(CONTAINER_OTEL_CONTRIB.get(), CONTAINER_PORTS_OTEL_CONTRIB);
         log.info("{}, mapped ports: {}", CONTAINER_OTEL_CONTRIB, otelContribMappedPorts);
@@ -87,7 +89,7 @@ public class ContainerManager {
         }));
 
         final Map<String, String> configMap = createOtelContribContainerProperties();
-        log.info("Spring Boot Actuator dynamic properties for otel-contrib testcontainer: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
+        log.info("Spring Boot Actuator dynamic properties for otelcol testcontainer: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
         configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
     }
 
@@ -147,35 +149,39 @@ public class ContainerManager {
         return otelContribThread;
     }
 
+    /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only (because Micrometer limitation, no Metric GRPC support yet)
+    /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties]        (since 3.4.0) - HTTP or GRPC
+    /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties]        (since 3.4.0) - HTTP or GRPC
     @SuppressWarnings({"unused"})
     private static @NotNull Map<String, String> createOtelContribContainerProperties() {
-        final Integer otelContribGrpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // GRPC port 4317
-        final Integer otelContribHttpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // HTTP port 4318
-        final Integer grafanaGrpcPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4317); // GRPC port 4317
-        final Integer grafanaHttpPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4318); // HTTP port 4318
-
-        /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP (Micrometer limitation, no GRPC support yet)
-        /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties]        (since 3.4.0) - HTTP or GRPC
-        /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties]        (since 3.4.0) - HTTP or GRPC
+        final Integer grpcPort;
+        final Integer httpPort;
+        if (SPRING_BOOT_OTLP_SEND_TO_OTELCOL) {
+            httpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // Grafana Otel OTLP - HTTP port 4318
+            grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // Grafana Otel OTLP - GRPC port 4317
+        } else {
+            httpPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4318); // Otelcol OTLP - HTTP port 4318
+            grpcPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4317); // Otelcol OTLP - GRPC port 4317
+        }
 
         final Map<String, String> otelContribDynamicProperties = new LinkedHashMap<>();
         otelContribDynamicProperties.put("management.otlp.metrics.export.step", "2s"); // default 1m is too slow for tests; make it faster for tests
-        otelContribDynamicProperties.put("management.otlp.metrics.export.url", "http://localhost:" + grafanaHttpPort + "/v1/metrics");
-        switch (CONTAINER_OTEL_CONTRIB_PREFERRED_TRANSPORT) {
+        otelContribDynamicProperties.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
+        switch (SPRING_BOOT_OTLP_PREFERRED_TRANSPORT) {
             case HTTP:
                 otelContribDynamicProperties.put("management.otlp.logging.transport", "HTTP");
-                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + grafanaHttpPort + "/v1/logs");
+                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
                 otelContribDynamicProperties.put("management.otlp.tracing.transport", "HTTP");
-                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + grafanaHttpPort + "/v1/traces");
+                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
                 break;
             case GRPC:
                 otelContribDynamicProperties.put("management.otlp.logging.transport", "GRPC");
-                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + grafanaGrpcPort);
+                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort);
                 otelContribDynamicProperties.put("management.otlp.tracing.transport", "GRPC");
-                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + grafanaGrpcPort);
+                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort);
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported transport " + CONTAINER_OTEL_CONTRIB_PREFERRED_TRANSPORT);
+                throw new IllegalArgumentException("Unsupported transport " + SPRING_BOOT_OTLP_PREFERRED_TRANSPORT);
         }
         return otelContribDynamicProperties;
     }
