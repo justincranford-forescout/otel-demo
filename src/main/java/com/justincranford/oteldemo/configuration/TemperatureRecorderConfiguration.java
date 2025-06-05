@@ -4,6 +4,8 @@ import com.justincranford.oteldemo.service.TemperatureService;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Measurement;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,13 +33,20 @@ public class TemperatureRecorderConfiguration {
     // This should probably be in a Service
     @Scheduled(fixedRate=10000) // milliseconds; From javadoc: "With virtual threads, fixed rates and cron triggers are recommended over fixed delays."
     public void recordTemperature() {
-        log.info("Recording temperature...");
-        final Iterable<Measurement> temperatureMeasurements = this.temperatureMetric.measure();
-        for (final Measurement measurement : temperatureMeasurements) {
-            final double value = measurement.getValue();
-            temperatureService.saveTemperature((float) value);
+        final Span span = Span.current();
+        try {
+            log.info("Recording temperature...");
+            final Iterable<Measurement> temperatureMeasurements = this.temperatureMetric.measure();
+            for (final Measurement measurement : temperatureMeasurements) {
+                final double value = measurement.getValue();
+                temperatureService.saveTemperature((float) value);
+            }
+            log.info("Recording temperature done");
+            span.setStatus(StatusCode.OK);
+        } catch(Throwable t) {
+            span.setStatus(StatusCode.ERROR);
+            throw t;
         }
-        log.info("Recording temperature done");
     }
 
     private double measureTemperature() {

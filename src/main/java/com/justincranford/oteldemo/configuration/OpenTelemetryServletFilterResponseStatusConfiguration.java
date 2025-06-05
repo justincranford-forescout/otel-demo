@@ -14,7 +14,7 @@ import jakarta.servlet.Filter;
 import java.io.IOException;
 
 @Configuration
-public class ServletFilterOpenTelemetryResponseStatusConfiguration {
+public class OpenTelemetryServletFilterResponseStatusConfiguration {
     @Bean
     public Filter otelStatusFilter() {
         return new OtelStatusFilter();
@@ -26,8 +26,8 @@ public class ServletFilterOpenTelemetryResponseStatusConfiguration {
             try {
                 chain.doFilter(request, response);
             } finally {
-                int status = ((HttpServletResponse) response).getStatus();
-                Span span = Span.current();
+                final int status = ((HttpServletResponse) response).getStatus();
+                final Span span = Span.current();
                 if (status >= 200 && status < 300) {
                     span.setStatus(StatusCode.OK);
                 } else {
