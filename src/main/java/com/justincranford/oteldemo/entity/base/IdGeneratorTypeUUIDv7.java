@@ -12,5 +12,5 @@ import static java.lang.annotation.ElementType.METHOD;
 @IdGeneratorType(IdGeneratorUUIDv7.class)
 @Retention(RetentionPolicy.RUNTIME)
 @Target({FIELD, METHOD})
-public @interface GeneratedUuidV7 {
+public @interface IdGeneratorTypeUUIDv7 {
 }

@@ -8,7 +8,7 @@ import jakarta.persistence.MappedSuperclass;
 @SuppressWarnings({"unused"})
 public abstract class AbstractEntity {
     @Id
-    @GeneratedUuidV7
+    @IdGeneratorTypeUUIDv7
     @Column(nullable=false,updatable=false,columnDefinition="uuid")
     private java.util.UUID id;
 }
