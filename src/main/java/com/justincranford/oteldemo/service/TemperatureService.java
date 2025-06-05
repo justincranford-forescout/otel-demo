@@ -18,18 +18,25 @@ import java.util.List;
 public class TemperatureService {
     private final TemperatureRepository temperatureRepository;
 
-    public void saveTemperatures(final List<Float> temperatures) {
-        for (final Float value : temperatures) {
-            saveTemperature(value);
-        }
+    public void saveTemperatures(final List<Float> values) {
+        final List<Temperature> temperatures = values.stream().map(value -> (
+            temperatureRepository.save(
+                Temperature.builder()
+                .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
+                .celcius(value)
+                .build()
+            )
+        )).toList();
         log.info("Saved {} temperatures: {}", temperatures.size(), temperatures);
     }
 
     public void saveTemperature(final float value) {
-        final Temperature temperature = temperatureRepository.save(Temperature.builder()
-            .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
-            .celcius(value)
-            .build());
+        final Temperature temperature = temperatureRepository.save(
+            Temperature.builder()
+                .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
+                .celcius(value)
+                .build()
+        );
         log.info("Saved temperature: {}", temperature);
     }
 }

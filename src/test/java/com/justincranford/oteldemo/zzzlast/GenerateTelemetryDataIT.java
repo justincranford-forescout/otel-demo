@@ -67,9 +67,17 @@ class GenerateTelemetryDataIT extends AbstractIT {
     }
 
     @Test
-    void controllerTrace() {
-        log.info("Starting controllerTrace thread...");
+    void controllerTrace1() {
+        log.info("Starting controllerTrace1 thread...");
         final String url = super.baseUrl() + "/hello";
+        final RestTemplate restTemplate = new RestTemplateBuilder().build();
+        doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 5000, 10000, "get " + url);
+    }
+
+    @Test
+    void controllerTrace2() {
+        log.info("Starting controllerTrace2 thread...");
+        final String url = super.baseUrl() + "/hello/telemetry";
         final RestTemplate restTemplate = new RestTemplateBuilder().build();
         doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 5000, 10000, "get " + url);
     }

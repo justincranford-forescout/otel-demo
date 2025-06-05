@@ -56,14 +56,14 @@ public class ContainerUtil {
 
     public static void printUrlsWithMappedPorts(final String baseUrl) {
         final List<String> urlsWithMappedPorts = new java.util.ArrayList<>();
+        for (final Integer port : CONTAINER_PORTS_GRAFANA_LGTM) {
+            urlsWithMappedPorts.add(String.format("grafana-lgtm %d:    http://localhost:%d/", port, ContainerManager.CONTAINER_GRAFANA_LGTM.get().getMappedPort(port)));
+        }
         for (final String path : ACTUATOR_ENDPOINTS) {
             urlsWithMappedPorts.add(String.format("spring-boot-actuator: %s%s", baseUrl, path));
         }
         for (final Integer port : CONTAINER_PORTS_OTEL_CONTRIB) {
             urlsWithMappedPorts.add(String.format("otel-contrib %d:    http://localhost:%d/", port, CONTAINER_OTEL_CONTRIB.get().getMappedPort(port)));
-        }
-        for (final Integer port : CONTAINER_PORTS_GRAFANA_LGTM) {
-            urlsWithMappedPorts.add(String.format("grafana-lgtm %d:    http://localhost:%d/", port, ContainerManager.CONTAINER_GRAFANA_LGTM.get().getMappedPort(port)));
         }
         log.info("URLs:\n{}", String.join("\n", urlsWithMappedPorts));
     }

@@ -28,7 +28,8 @@ public class TemperatureRecorderConfiguration {
         this.temperatureMetric = Gauge.builder("TemperatureRecorder", this, obj -> measureTemperature()).description("TemperatureRecorder").baseUnit("celsius").register(this.meterRegistry);
     }
 
-    @Scheduled(fixedRate=1000) // milliseconds; From javadoc: "With virtual threads, fixed rates and cron triggers are recommended over fixed delays."
+    // This should probably be in a Service
+    @Scheduled(fixedRate=10000) // milliseconds; From javadoc: "With virtual threads, fixed rates and cron triggers are recommended over fixed delays."
     public void recordTemperature() {
         log.info("Recording temperature...");
         final Iterable<Measurement> temperatureMeasurements = this.temperatureMetric.measure();

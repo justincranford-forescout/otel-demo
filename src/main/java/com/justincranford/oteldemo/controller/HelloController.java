@@ -1,7 +1,6 @@
 package com.justincranford.oteldemo.controller;
 
-import com.justincranford.oteldemo.repository.TemperatureRepository;
-import com.justincranford.oteldemo.repository.UserRepository;
+import com.justincranford.oteldemo.service.TemperatureService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 
 import static com.justincranford.oteldemo.util.SecureRandomUtil.SECURE_RANDOM;
 import static com.justincranford.oteldemo.util.SleepUtil.waitMillis;
@@ -40,8 +40,7 @@ public class HelloController {
     private Observation observation;
     private Gauge gauge;
 
-    private final UserRepository userRepository;
-    private final TemperatureRepository temperatureRepository;
+    private final TemperatureService temperatureService;
 
     @PostConstruct
     public void postConstruct() {
@@ -56,21 +55,29 @@ public class HelloController {
 
     @GetMapping("/hello")
     public String hello() {
-        try (final MDC.MDCCloseable ignored = MDC.putCloseable("Hello?", "Is it me you're looking for?")) {
+        final long currentCount = atomicLong.incrementAndGet(); // local metric
+        return "Hello " + currentCount + "!";
+    }
+
+    @GetMapping("/hello/telemetry")
+    public String helloTelemetry() {
+        try (final MDC.MDCCloseable ignored = MDC.putCloseable("Hello Telemetry?", "Is it me you're looking for?")) { // custom MDC field
             final long currentCount = atomicLong.incrementAndGet(); // local metric
 
             this.upLongCounter.add(100); // custom metric
             this.upLongDownCounter.add(SECURE_RANDOM.nextBoolean() ? -1 : 1); // custom metric
             this.upCounter.increment(); // custom metric
 
-            waitMillis("Simulate processing delay before custom trace span", SECURE_RANDOM.nextLong(100, 150));
+            waitMillis("Simulate processing delay BEFORE custom trace span", SECURE_RANDOM.nextLong(100, 150));
             this.observation.observe(() -> { // custom trace span
                 this.gauge.measure();
 
-                waitMillis("Simulate processing delay during custom trace span", SECURE_RANDOM.nextLong(150, 250));
+                temperatureService.saveTemperatures(IntStream.rangeClosed(1, 10000).mapToObj(i -> (float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)).toList());
+
+                waitMillis("Simulate processing delay DURING custom trace span", SECURE_RANDOM.nextLong(150, 250));
                 log.info("Hello OpenTelemetry {}!", currentCount);
             });
-            waitMillis("Simulate processing delay after custom trace span", SECURE_RANDOM.nextLong(50, 100));
+            waitMillis("Simulate processing delay AFTER custom trace span", SECURE_RANDOM.nextLong(50, 100));
 
             return "Hello OpenTelemetry " + currentCount + "!";
         }

@@ -15,12 +15,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class HelloControllerIT extends AbstractIT {
     @Test
     void testHelloApi_verifyBuiltInPrometheus_verifyOtelPrometheus() {
+        extracted(super.baseUrl() + "/hello");
+    }
+
+    @Test
+    void testHelloTelemetryApi_verifyBuiltInPrometheus_verifyOtelPrometheus() {
+        extracted(super.baseUrl() + "/hello/telemetry");
+    }
+
+    private static void extracted(String url) {
         final RestTemplate restTemplate = new RestTemplateBuilder().build();
-        final ResponseEntity<String> responseEntity = restTemplate.getForEntity(super.baseUrl() + "/hello", String.class);
+        final ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
         final HttpStatusCode statusCode = responseEntity.getStatusCode();
         final String responseBody = responseEntity.getBody();
         assertEquals(HttpStatus.OK, statusCode);
         assertNotNull(responseBody);
-        log.info("Hello API response:\n{}", responseBody);
+        log.info("Hello Controller {} API response:\n{}", url, responseBody);
     }
 }
