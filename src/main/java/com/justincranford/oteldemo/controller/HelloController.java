@@ -72,7 +72,7 @@ public class HelloController {
             this.observation.observe(() -> { // custom trace span
                 this.gauge.measure();
 
-                temperatureService.saveTemperatures(IntStream.rangeClosed(1, 10000).mapToObj(i -> (float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)).toList());
+                temperatureService.saveManyTemperatures(IntStream.rangeClosed(1, 10000).mapToObj(i -> (float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)).toList());
 
                 waitMillis("Simulate processing delay DURING custom trace span", SECURE_RANDOM.nextLong(150, 250));
                 log.info("Hello OpenTelemetry {}!", currentCount);

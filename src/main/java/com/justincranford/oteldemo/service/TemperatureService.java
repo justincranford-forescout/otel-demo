@@ -1,5 +1,6 @@
 package com.justincranford.oteldemo.service;
 
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import com.justincranford.oteldemo.entity.Temperature;
 import com.justincranford.oteldemo.repository.TemperatureRepository;
 import jakarta.transaction.Transactional;
@@ -18,25 +19,23 @@ import java.util.List;
 public class TemperatureService {
     private final TemperatureRepository temperatureRepository;
 
-    public void saveTemperatures(final List<Float> values) {
-        final List<Temperature> temperatures = values.stream().map(value -> (
-            temperatureRepository.save(
-                Temperature.builder()
-                .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
-                .celcius(value)
-                .build()
-            )
-        )).toList();
+    public void saveManyTemperatures(final List<Float> values) {
+        final List<Temperature> temperatures = values.stream().map(this::saveTemperature).toList();
         log.info("Saved {} temperatures: {}", temperatures.size(), temperatures);
     }
 
-    public void saveTemperature(final float value) {
-        final Temperature temperature = temperatureRepository.save(
+    public void saveOneTemperature(final float value) {
+        final Temperature temperature = saveTemperature(value);
+        log.info("Saved temperature: {}", temperature);
+    }
+
+    @WithSpan
+    private Temperature saveTemperature(final float value) {
+        return temperatureRepository.save(
             Temperature.builder()
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
                 .celcius(value)
                 .build()
         );
-        log.info("Saved temperature: {}", temperature);
     }
 }

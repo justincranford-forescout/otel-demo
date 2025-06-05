@@ -13,8 +13,9 @@ import jakarta.servlet.Filter;
 
 import java.io.IOException;
 
+// do this for all controllers, instead of @WithSpan in each controller
 @Configuration
-public class OpenTelemetryServletFilterResponseStatusConfiguration {
+public class OpenTelemetryServletFilterConfiguration {
     @Bean
     public Filter otelStatusFilter() {
         return new OtelStatusFilter();

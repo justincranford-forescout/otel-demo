@@ -1,4 +1,4 @@
-package com.justincranford.oteldemo.configuration;
+package com.justincranford.oteldemo.task;
 
 import com.justincranford.oteldemo.service.TemperatureService;
 import io.micrometer.core.instrument.Gauge;
@@ -9,7 +9,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +16,8 @@ import static com.justincranford.oteldemo.util.SecureRandomUtil.SECURE_RANDOM;
 
 @Component
 @RequiredArgsConstructor
-@EnableScheduling
 @Slf4j
-public class TemperatureRecorderConfiguration {
+public class TemperatureRecorderScheduledTask {
     private final MeterRegistry meterRegistry;
     private final TemperatureService temperatureService;
 
@@ -39,7 +37,7 @@ public class TemperatureRecorderConfiguration {
             final Iterable<Measurement> temperatureMeasurements = this.temperatureMetric.measure();
             for (final Measurement measurement : temperatureMeasurements) {
                 final double value = measurement.getValue();
-                temperatureService.saveTemperature((float) value);
+                temperatureService.saveOneTemperature((float) value);
             }
             log.info("Recording temperature done");
             span.setStatus(StatusCode.OK);
