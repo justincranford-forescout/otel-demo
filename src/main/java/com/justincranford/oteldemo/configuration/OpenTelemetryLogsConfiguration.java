@@ -1,4 +1,4 @@
-package com.justincranford.oteldemo;
+package com.justincranford.oteldemo.configuration;
 
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;

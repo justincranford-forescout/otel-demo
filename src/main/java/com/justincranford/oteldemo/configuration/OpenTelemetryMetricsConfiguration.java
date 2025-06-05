@@ -1,4 +1,4 @@
-package com.justincranford.oteldemo;
+package com.justincranford.oteldemo.configuration;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCustomizer;

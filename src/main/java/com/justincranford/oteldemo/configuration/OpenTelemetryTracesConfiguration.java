@@ -1,13 +1,12 @@
-package com.justincranford.oteldemo;
+package com.justincranford.oteldemo.configuration;
 
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
+//@Configuration
 public class OpenTelemetryTracesConfiguration {
     @Bean
     public SpanProcessor customSpanProcessor() {

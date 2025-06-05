@@ -51,8 +51,8 @@ dependencies {
 	implementation 'com.h2database:h2'
 
 	implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-	implementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'io.micrometer:micrometer-registry-otlp'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 	implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.16.0-alpha'
 
@@ -63,7 +63,7 @@ dependencies {
 //	testImplementation 'org.testcontainers:junit-jupiter'
 	testImplementation "org.testcontainers:grafana"
 	testImplementation "org.testcontainers:postgresql"
-	testRuntimeOnly 'com.azure.spring:spring-cloud-azure-starter-monitor:5.22.0'
+//	testRuntimeOnly 'com.azure.spring:spring-cloud-azure-starter-monitor:5.22.0'
 }
 
 tasks.named('test') {

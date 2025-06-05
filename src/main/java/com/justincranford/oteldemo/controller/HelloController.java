@@ -1,4 +1,4 @@
-package com.justincranford.oteldemo;
+package com.justincranford.oteldemo.controller;
 
 import com.justincranford.oteldemo.repository.TemperatureRepository;
 import com.justincranford.oteldemo.repository.UserRepository;
@@ -45,7 +45,7 @@ public class HelloController {
 
     @PostConstruct
     public void postConstruct() {
-        final Meter meter = openTelemetry.getMeterProvider().get("com.justincranford.oteldemo.HelloController");
+        final Meter meter = openTelemetry.getMeterProvider().get(HelloController.class.getCanonicalName());
 
         this.upLongCounter = meter.counterBuilder("HelloController.upLongCounter").setDescription("HelloController upLongCounter").build();
         this.upLongDownCounter = meter.upDownCounterBuilder("HelloController.upLongDownCounter").setDescription("HelloController upLongDownCounter").build();
