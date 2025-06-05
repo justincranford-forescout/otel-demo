@@ -33,28 +33,28 @@ class GenerateTelemetryDataIT extends AbstractIT {
     @Test
     void logs() {
         log.info("Starting logs thread...");
-        doLoopInThread(currentIteration -> log.info("Log message {}", currentIteration), 3000, 5000, "logging");
+        doLoopInThread(currentIteration -> log.info("Log message {}", currentIteration), 5000, 10000, "logging");
     }
 
     @Test
     void counterMetric() {
         log.info("Starting counterMetric thread...");
         final Counter counter = Counter.builder("example.counter").description("counter example").baseUnit("tasks").tags("a", "1", "b", "2").register(super.meterRegistry());
-        doLoopInThread(currentIteration ->  counter.increment(), 1000, 2000, "increment counter");
+        doLoopInThread(currentIteration ->  counter.increment(), 3000, 5000, "increment counter");
     }
 
     @Test
     void histogramMetric() {
         log.info("Starting histogramMetric thread...");
         final DistributionSummary histogram = DistributionSummary.builder("example.histogram").description("histogram example").baseUnit("ms").tags("b", "2", "c", "3").register(super.meterRegistry());
-        doLoopInThread(currentIteration ->  histogram.record(SECURE_RANDOM.nextDouble(1, 2000)), 1000, 2000, "record histogram");
+        doLoopInThread(currentIteration ->  histogram.record(SECURE_RANDOM.nextDouble(1, 2000)), 3000, 5000, "record histogram");
     }
 
     @Test
     void gaugeMetric() {
         log.info("Starting gaugeMetric thread...");
         final Gauge gauge = Gauge.builder("example.gauge", this, obj -> SECURE_RANDOM.nextInt(0, 100)).description("gauge example").baseUnit("celsius").register(super.meterRegistry());
-        doLoopInThread(currentIteration ->  gauge.measure(), 1000, 2000, "measure gauge");
+        doLoopInThread(currentIteration ->  gauge.measure(), 3000, 5000, "measure gauge");
     }
 
     @Test
