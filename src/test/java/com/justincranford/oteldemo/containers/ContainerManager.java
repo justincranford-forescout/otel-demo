@@ -8,11 +8,13 @@ import org.springframework.boot.actuate.autoconfigure.tracing.otlp.Transport;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.grafana.LgtmStackContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,11 +26,13 @@ import static com.justincranford.oteldemo.util.FileUtil.prefixAllLines;
 import static com.justincranford.oteldemo.util.FileUtil.readFileContents;
 import static com.justincranford.oteldemo.util.FileUtil.writeFileContents;
 import static java.util.Objects.requireNonNull;
+import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 @Slf4j
 public class ContainerManager {
-    private static final boolean SEND_TO_OTELCOL = false; // true=otelcol, false=grafana-lgtm
+    private static final boolean USE_OTELCOL = false; // true=otelcol, false=grafana-lgtm
     private static final Transport OTLP_TRANSPORT = Transport.HTTP; // HTTP or GRPC; only affects Traces and Logs; Metrics GRPC is missing (Micrometer limitation)
+    private static final boolean USE_POSTGRESQL = false; // true=postgresql, false=h2
 
     private static final ClassLoader CLASS_LOADER = ContainerManager.class.getClassLoader();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -36,6 +40,7 @@ public class ContainerManager {
     private static final Duration TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START = Duration.ofSeconds(45);
     private static final DockerImageName DOCKER_IMAGE_NAME_GRAFANA_LGTM = DockerImageName.parse("grafana/otel-lgtm:latest");
     private static final DockerImageName DOCKER_IMAGE_NAME_OTEL_CONTRIB = DockerImageName.parse("otel/opentelemetry-collector:latest");
+    private static final DockerImageName DOCKER_IMAGE_NAME_POSTGRESQL = DockerImageName.parse("postgres:latest");
 
     public static final AtomicReference<GenericContainer<?>> CONTAINER_GRAFANA_LGTM = new AtomicReference<>(); // Grafana LGTM (Logs=Loki, GUI=Grafana, Traces=Tempo, Metrics=Prometheus)
     public static final Integer[] CONTAINER_PORTS_GRAFANA_LGTM = {3000, 4317, 4318, 3200, 9090}; // 3000=Grafana, 4317=OTLP GRPC, 4318=OTLP HTTP, 3200=Tempo, 9090=Prometheus
@@ -43,8 +48,11 @@ public class ContainerManager {
     public static final AtomicReference<GenericContainer<?>> CONTAINER_OTEL_CONTRIB = new AtomicReference<>(); // OpenTelemetry + Contrib
     public static final Integer[] CONTAINER_PORTS_OTEL_CONTRIB = {4317, 4318, 8888, 1777, 55679}; // 4317=GRPC, 4318=HTTP, 8888=Metrics (Prometheus), 1777=pprof, 55679=zpages
 
+    public static final AtomicReference<GenericContainer<?>> CONTAINER_POSTGRESQL = new AtomicReference<>(); // OpenTelemetry + Contrib
+    public static final Integer[] CONTAINER_PORTS_POSTGRESQL = {POSTGRESQL_PORT};
+
     private static final AtomicReference<Boolean> INITIALIZED = new AtomicReference<>(Boolean.FALSE);
-    private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = List.of(CONTAINER_GRAFANA_LGTM, CONTAINER_OTEL_CONTRIB);
+    private static final List<AtomicReference<GenericContainer<?>>> CONTAINER_REFERENCES = new ArrayList<>(List.of(CONTAINER_GRAFANA_LGTM, CONTAINER_OTEL_CONTRIB, CONTAINER_POSTGRESQL));
 
     public static void initialize(final DynamicPropertyRegistry registry) throws JsonProcessingException {
         if (INITIALIZED.getAndSet(Boolean.TRUE)) {
@@ -52,15 +60,22 @@ public class ContainerManager {
             return;
         }
 
-        // Group 1: grafana-lgtm (must start before otelcol)
+        // Group 1: grafana-lgtm (must start before otelcol), postgresql
         startContainersConcurrently(List.of(asyncStartContainerGrafanaLgtm()), TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START);
         final Map<Integer, Integer> grafanaLgtmMappedPorts = getMappedPorts(CONTAINER_GRAFANA_LGTM.get(), CONTAINER_PORTS_GRAFANA_LGTM);
         log.info("{}, mapped ports: {}", CONTAINER_GRAFANA_LGTM, grafanaLgtmMappedPorts);
 
         // Group 2: otelcol (must start after grafana-lgtm, because it will export telemetry through the mapped ports of grafana-lgtm)
         startContainersConcurrently(List.of(asyncStartContainerOtelContrib(grafanaLgtmMappedPorts)), TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START);
-        final Map<Integer, Integer> otelContribMappedPorts = getMappedPorts(CONTAINER_OTEL_CONTRIB.get(), CONTAINER_PORTS_OTEL_CONTRIB);
-        log.info("{}, mapped ports: {}", CONTAINER_OTEL_CONTRIB, otelContribMappedPorts);
+        log.info("{}, mapped ports: {}", CONTAINER_OTEL_CONTRIB, getMappedPorts(CONTAINER_OTEL_CONTRIB.get(), CONTAINER_PORTS_OTEL_CONTRIB));
+
+        // Group 3: postgresql
+        if (USE_POSTGRESQL) {
+            startContainersConcurrently(List.of(asyncStartContainerPostgres()), TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START);
+            log.info("{}, mapped ports: {}", CONTAINER_POSTGRESQL, getMappedPorts(CONTAINER_POSTGRESQL.get(), CONTAINER_PORTS_POSTGRESQL));
+        } else {
+            CONTAINER_REFERENCES.remove(CONTAINER_POSTGRESQL);
+        }
 
         for (final AtomicReference<GenericContainer<?>> containerReference : CONTAINER_REFERENCES) {
             if (containerReference.get() == null) {
@@ -90,9 +105,60 @@ public class ContainerManager {
             }
         }));
 
-        final Map<String, String> configMap = createOtelContribContainerProperties();
-        log.info("Spring Boot Actuator dynamic properties for otelcol testcontainer: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
+        final Map<String, String> configMap = createContainerProperties();
+        log.info("Spring Boot Actuator dynamic properties for testcontainers: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
         configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
+    }
+
+    /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only (because Micrometer limitation, no Metric GRPC support yet)
+    /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties]        (since 3.4.0) - HTTP or GRPC
+    /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties]        (since 3.4.0) - HTTP or GRPC
+    @SuppressWarnings({"unused"})
+    private static @NotNull Map<String, String> createContainerProperties() {
+        final Integer grpcPort;
+        final Integer httpPort;
+        if (USE_OTELCOL) {
+            httpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // Grafana Otel OTLP HTTP port 4318
+            grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // Grafana Otel OTLP GRPC port 4317
+        } else {
+            httpPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4318); // Otelcol OTLP HTTP port 4318
+            grpcPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4317); // Otelcol OTLP GRPC port 4317
+        }
+
+        final Map<String, String> otelContribDynamicProperties = new LinkedHashMap<>();
+        otelContribDynamicProperties.put("management.otlp.metrics.export.step", "2s"); // default 1m is too slow for tests; make it faster for tests
+        otelContribDynamicProperties.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
+        switch (OTLP_TRANSPORT) {
+            case HTTP:
+                otelContribDynamicProperties.put("management.otlp.logging.transport", "HTTP");
+                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
+                otelContribDynamicProperties.put("management.otlp.tracing.transport", "HTTP");
+                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
+                break;
+            case GRPC:
+                otelContribDynamicProperties.put("management.otlp.logging.transport", "GRPC");
+                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort);
+                otelContribDynamicProperties.put("management.otlp.tracing.transport", "GRPC");
+                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort);
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported transport " + OTLP_TRANSPORT);
+        }
+        if (USE_POSTGRESQL) {
+            final Integer postgresqlPort = CONTAINER_POSTGRESQL.get().getMappedPort(5432);
+            otelContribDynamicProperties.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+            otelContribDynamicProperties.put("spring.datasource.url", "jdbc:postgresql://localhost:" + postgresqlPort + "/postgresqlDatabase");
+            otelContribDynamicProperties.put("spring.datasource.username", "postgresqlUsername");
+            otelContribDynamicProperties.put("spring.datasource.password", "postgresqlPassword");
+            otelContribDynamicProperties.put("spring.datasource.driver-class-name", "org.postgresql.Driver");
+        } else {
+            otelContribDynamicProperties.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+            otelContribDynamicProperties.put("spring.datasource.url", "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE;MODE=PostgreSQL;");
+            otelContribDynamicProperties.put("spring.datasource.username", "h2Username");
+            otelContribDynamicProperties.put("spring.datasource.password", "h2Password");
+            otelContribDynamicProperties.put("spring.datasource.driver-class-name", "org.h2.Driver");
+        }
+        return otelContribDynamicProperties;
     }
 
     private static @NotNull Thread asyncStartContainerGrafanaLgtm() {
@@ -151,40 +217,25 @@ public class ContainerManager {
         return otelContribThread;
     }
 
-    /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only (because Micrometer limitation, no Metric GRPC support yet)
-    /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties]        (since 3.4.0) - HTTP or GRPC
-    /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties]        (since 3.4.0) - HTTP or GRPC
-    @SuppressWarnings({"unused"})
-    private static @NotNull Map<String, String> createOtelContribContainerProperties() {
-        final Integer grpcPort;
-        final Integer httpPort;
-        if (SEND_TO_OTELCOL) {
-            httpPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4318); // Grafana Otel OTLP - HTTP port 4318
-            grpcPort = CONTAINER_OTEL_CONTRIB.get().getMappedPort(4317); // Grafana Otel OTLP - GRPC port 4317
-        } else {
-            httpPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4318); // Otelcol OTLP - HTTP port 4318
-            grpcPort = CONTAINER_GRAFANA_LGTM.get().getMappedPort(4317); // Otelcol OTLP - GRPC port 4317
-        }
-
-        final Map<String, String> otelContribDynamicProperties = new LinkedHashMap<>();
-        otelContribDynamicProperties.put("management.otlp.metrics.export.step", "2s"); // default 1m is too slow for tests; make it faster for tests
-        otelContribDynamicProperties.put("management.otlp.metrics.export.url", "http://localhost:" + httpPort + "/v1/metrics");
-        switch (OTLP_TRANSPORT) {
-            case HTTP:
-                otelContribDynamicProperties.put("management.otlp.logging.transport", "HTTP");
-                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + httpPort + "/v1/logs");
-                otelContribDynamicProperties.put("management.otlp.tracing.transport", "HTTP");
-                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + httpPort + "/v1/traces");
-                break;
-            case GRPC:
-                otelContribDynamicProperties.put("management.otlp.logging.transport", "GRPC");
-                otelContribDynamicProperties.put("management.otlp.logging.endpoint", "http://localhost:" + grpcPort);
-                otelContribDynamicProperties.put("management.otlp.tracing.transport", "GRPC");
-                otelContribDynamicProperties.put("management.otlp.tracing.endpoint", "http://localhost:" + grpcPort);
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported transport " + OTLP_TRANSPORT);
-        }
-        return otelContribDynamicProperties;
+    private static @NotNull Thread asyncStartContainerPostgres() {
+        final Thread postgresThread = new Thread(() -> {
+            if (CONTAINER_POSTGRESQL.get() == null) {
+                final long nanosStart = System.nanoTime();
+                final PostgreSQLContainer<?> container = new PostgreSQLContainer<>(DOCKER_IMAGE_NAME_POSTGRESQL)
+                    .withDatabaseName("postgresqlDatabase")
+                    .withUsername("postgresqlUsername")
+                    .withPassword("postgresqlPassword");
+                container.withNetworkAliases("postgres-1");
+                container.start(); // long blocking call
+                CONTAINER_POSTGRESQL.set(container);
+                log.info("{} started in {}, ports: {}", DOCKER_IMAGE_NAME_POSTGRESQL, Duration.ofNanos(System.nanoTime() - nanosStart), getMappedPorts(container, CONTAINER_PORTS_POSTGRESQL));
+            } else {
+                log.warn("{} already running", DOCKER_IMAGE_NAME_POSTGRESQL);
+            }
+        });
+        postgresThread.setName(DOCKER_IMAGE_NAME_POSTGRESQL.toString());
+        postgresThread.setDaemon(true);
+        postgresThread.start();
+        return postgresThread;
     }
 }

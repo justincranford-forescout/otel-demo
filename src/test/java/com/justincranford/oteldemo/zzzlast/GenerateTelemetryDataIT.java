@@ -1,4 +1,4 @@
-package com.justincranford.oteldemo.zzz;
+package com.justincranford.oteldemo.zzzlast;
 
 import com.justincranford.oteldemo.AbstractIT;
 import io.micrometer.core.instrument.Counter;
@@ -33,28 +33,28 @@ class GenerateTelemetryDataIT extends AbstractIT {
     @Test
     void logs() {
         log.info("Starting logs thread...");
-        doLoopInThread(currentIteration -> log.info("Log message {}", currentIteration), 1000, 3000, "logging");
+        doLoopInThread(currentIteration -> log.info("Log message {}", currentIteration), 3000, 5000, "logging");
     }
 
     @Test
     void counterMetric() {
         log.info("Starting counterMetric thread...");
         final Counter counter = Counter.builder("example.counter").description("counter example").baseUnit("tasks").tags("a", "1", "b", "2").register(super.meterRegistry());
-        doLoopInThread(currentIteration ->  counter.increment(), 500, 1000, "increment counter");
+        doLoopInThread(currentIteration ->  counter.increment(), 1000, 2000, "increment counter");
     }
 
     @Test
     void histogramMetric() {
         log.info("Starting histogramMetric thread...");
         final DistributionSummary histogram = DistributionSummary.builder("example.histogram").description("histogram example").baseUnit("ms").tags("b", "2", "c", "3").register(super.meterRegistry());
-        doLoopInThread(currentIteration ->  histogram.record(SECURE_RANDOM.nextDouble(1, 2000)), 500, 1000, "record histogram");
+        doLoopInThread(currentIteration ->  histogram.record(SECURE_RANDOM.nextDouble(1, 2000)), 1000, 2000, "record histogram");
     }
 
     @Test
     void gaugeMetric() {
         log.info("Starting gaugeMetric thread...");
         final Gauge gauge = Gauge.builder("example.gauge", this, obj -> SECURE_RANDOM.nextInt(0, 100)).description("gauge example").baseUnit("celsius").register(super.meterRegistry());
-        doLoopInThread(currentIteration ->  gauge.measure(), 500, 1000, "measure gauge");
+        doLoopInThread(currentIteration ->  gauge.measure(), 1000, 2000, "measure gauge");
     }
 
     @Test
@@ -62,7 +62,7 @@ class GenerateTelemetryDataIT extends AbstractIT {
         log.info("Starting actuatorTraces threads...");
         final RestTemplate restTemplate = new RestTemplateBuilder().build();
         for (final String url : ACTUATOR_ENDPOINTS.stream().map(path -> super.baseUrl() + path).toList()) {
-            doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 500 * ACTUATOR_ENDPOINTS.size(), 1000 * ACTUATOR_ENDPOINTS.size(), "get " + url);
+            doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 5000 * ACTUATOR_ENDPOINTS.size(), 10000 * ACTUATOR_ENDPOINTS.size(), "get " + url);
         }
     }
 
@@ -71,7 +71,7 @@ class GenerateTelemetryDataIT extends AbstractIT {
         log.info("Starting controllerTrace thread...");
         final String url = super.baseUrl() + "/hello";
         final RestTemplate restTemplate = new RestTemplateBuilder().build();
-        doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 500, 1000, "get " + url);
+        doLoopInThread(currentIteration -> restTemplate.getForEntity(url, String.class), 5000, 10000, "get " + url);
     }
 
     @Order(Integer.MAX_VALUE)

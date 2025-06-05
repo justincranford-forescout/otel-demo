@@ -1,6 +1,9 @@
 package com.justincranford.oteldemo;
 
+import com.justincranford.oteldemo.repository.TemperatureRepository;
+import com.justincranford.oteldemo.repository.UserRepository;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -35,6 +38,10 @@ public class HelloController {
     private LongUpDownCounter upLongDownCounter;
     private Counter upCounter;
     private Observation observation;
+    private Gauge gauge;
+
+    private final UserRepository userRepository;
+    private final TemperatureRepository temperatureRepository;
 
     @PostConstruct
     public void postConstruct() {
@@ -44,6 +51,7 @@ public class HelloController {
         this.upLongDownCounter = meter.upDownCounterBuilder("HelloController.upLongDownCounter").setDescription("HelloController upLongDownCounter").build();
         this.upCounter = Counter.builder("HelloController.upCounter").description("HelloController.upCounter description").baseUnit("ms").tags("foo", "upCounter").register(this.meterRegistry);
         this.observation = Observation.createNotStarted("HelloController.span", this.observationRegistry).lowCardinalityKeyValue("foo", "observation");
+        this.gauge = Gauge.builder("HelloController.gauge", this, obj -> SECURE_RANDOM.nextInt(0, 100)).description("HelloController.gauge example").baseUnit("celsius").register(this.meterRegistry);
     }
 
     @GetMapping("/hello")
@@ -57,6 +65,8 @@ public class HelloController {
 
             waitMillis("Simulate processing delay before custom trace span", SECURE_RANDOM.nextLong(100, 150));
             this.observation.observe(() -> { // custom trace span
+                this.gauge.measure();
+
                 waitMillis("Simulate processing delay during custom trace span", SECURE_RANDOM.nextLong(150, 250));
                 log.info("Hello OpenTelemetry {}!", currentCount);
             });
