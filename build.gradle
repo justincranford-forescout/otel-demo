@@ -52,6 +52,8 @@ dependencies {
 	implementation 'io.micrometer:micrometer-registry-otlp'
 	implementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+	implementation 'io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations'
+	implementation 'io.opentelemetry.instrumentation:opentelemetry-jdbc:2.16.0-alpha'
 	implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.16.0-alpha'
 
 	implementation 'org.postgresql:postgresql'

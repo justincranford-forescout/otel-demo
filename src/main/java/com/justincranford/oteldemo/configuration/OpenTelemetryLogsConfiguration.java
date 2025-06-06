@@ -4,7 +4,7 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * ============================================================================
@@ -41,7 +41,7 @@ import org.springframework.stereotype.Component;
  * The OpenTelemetryAppender for both Logback and Log4j requires access to an OpenTelemetry instance to function properly. This instance must be set programmatically during application startup, which can be done like this:
  * ============================================================================
  */
-@Component
+@Configuration
 @RequiredArgsConstructor
 class OpenTelemetryLogsConfiguration implements InitializingBean {
     private final OpenTelemetry openTelemetry; // Bean managed by Spring Boot lifecycle

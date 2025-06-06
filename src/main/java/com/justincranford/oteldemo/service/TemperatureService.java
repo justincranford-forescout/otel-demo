@@ -21,12 +21,12 @@ public class TemperatureService {
 
     public void saveManyTemperatures(final List<Float> values) {
         final List<Temperature> temperatures = values.stream().map(this::saveTemperature).toList();
-        log.info("Saved {} temperatures: {}", temperatures.size(), temperatures);
+        log.trace("Saved {} temperatures: {}", temperatures.size(), temperatures);
     }
 
     public void saveOneTemperature(final float value) {
         final Temperature temperature = saveTemperature(value);
-        log.info("Saved temperature: {}", temperature);
+        log.trace("Saved temperature: {}", temperature);
     }
 
     @WithSpan
