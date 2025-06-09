@@ -25,10 +25,10 @@ OTLP is a vendor-neutral protocol for distributed systems to collect and transmi
 The LGTM in Grafana Otel LGTM has a double meaning. The common usage of LGTM is as an acronym in code reviews meaning `Looks Good To Me`.
 
 In Grafana, LGTM is an acronym for four different telemetry components bundled in a single container image:
-- `L`ogs (Loki) - Grafana logs database
-- `G`UI (Grafana) - Grafana UI
-- `M`etrics (Prometheus/Mimir) - Grafana metrics database
-- `T`races (Tempo) - Grafana traces database
+- `L`Logs (Loki) - Grafana logs database
+- `G`GUI (Grafana) - Grafana UI
+- `M`Metrics (Prometheus/Mimir) - Grafana metrics database
+- `T`Traces (Tempo) - Grafana traces database
 
 Grafana Otel LGTM is for `dev`, `stg`, and `demo` only. It is not intended for `prod` use.
 

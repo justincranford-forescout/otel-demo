@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
 import static com.justincranford.oteldemo.util.SecureRandomUtil.SECURE_RANDOM;
-import static com.justincranford.oteldemo.util.SleepUtil.waitMillis;
 
 @RestController
 @RequestMapping("/")
@@ -49,7 +48,6 @@ public class HelloController {
         this.upLongCounter = meter.counterBuilder("HelloController.upLongCounter").setDescription("HelloController upLongCounter").build();
         this.upLongDownCounter = meter.upDownCounterBuilder("HelloController.upLongDownCounter").setDescription("HelloController upLongDownCounter").build();
         this.upCounter = Counter.builder("HelloController.upCounter").description("HelloController.upCounter description").baseUnit("ms").tags("foo", "upCounter").register(this.meterRegistry);
-        this.observation = Observation.createNotStarted("HelloController.span", this.observationRegistry).lowCardinalityKeyValue("foo", "observation");
         this.gauge = Gauge.builder("HelloController.gauge", this, obj -> SECURE_RANDOM.nextInt(0, 100)).description("HelloController.gauge example").baseUnit("celsius").register(this.meterRegistry);
     }
 
@@ -67,18 +65,13 @@ public class HelloController {
             this.upLongCounter.add(100); // custom metric
             this.upLongDownCounter.add(SECURE_RANDOM.nextBoolean() ? -1 : 1); // custom metric
             this.upCounter.increment(); // custom metric
+            this.gauge.measure();
 
-            waitMillis("Simulate processing delay BEFORE custom trace span", SECURE_RANDOM.nextLong(100, 150));
-            this.observation.observe(() -> { // custom trace span
-                this.gauge.measure();
+            IntStream.rangeClosed(1, 2).forEach(temperature -> temperatureService.saveOneTemperature((float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)));
+            temperatureService.saveManyTemperatures(IntStream.rangeClosed(1, 10).mapToObj(i -> (float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)).toList());
+            IntStream.rangeClosed(1, 2).forEach(temperature -> temperatureService.saveOneTemperature((float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)));
 
-                temperatureService.saveManyTemperatures(IntStream.rangeClosed(1, 100).mapToObj(i -> (float) SECURE_RANDOM.nextDouble(-273.15F, 275.13F)).toList());
-
-                waitMillis("Simulate processing delay DURING custom trace span", SECURE_RANDOM.nextLong(150, 250));
-                log.info("Hello OpenTelemetry {}!", currentCount);
-            });
-            waitMillis("Simulate processing delay AFTER custom trace span", SECURE_RANDOM.nextLong(50, 100));
-
+            log.info("Hello OpenTelemetry {}!", currentCount);
             return "Hello OpenTelemetry " + currentCount + "!";
         }
     }
