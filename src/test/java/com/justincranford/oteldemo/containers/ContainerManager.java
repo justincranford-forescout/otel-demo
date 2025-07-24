@@ -59,7 +59,14 @@ public class ContainerManager {
             log.info("Test containers already initialized, skipping starting containers.");
             return;
         }
+        startContainers();
 
+        final Map<String, String> configMap = getContainerProperties();
+        log.info("Spring Boot Actuator dynamic properties for testcontainers: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
+        configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
+    }
+
+    private static void startContainers() {
         // Group 1: grafana-lgtm (must start before otelcol), postgresql
         startContainersConcurrently(List.of(asyncStartContainerGrafanaLgtm()), TOTAL_DURATION_FOR_ALL_CONTAINERS_TO_START);
         final Map<Integer, Integer> grafanaLgtmMappedPorts = getMappedPorts(CONTAINER_GRAFANA_LGTM.get(), CONTAINER_PORTS_GRAFANA_LGTM);
@@ -104,17 +111,13 @@ public class ContainerManager {
                 }
             }
         }));
-
-        final Map<String, String> configMap = createContainerProperties();
-        log.info("Spring Boot Actuator dynamic properties for testcontainers: {}", OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(configMap));
-        configMap.forEach((propertyName,propertyValue) -> registry.add(propertyName, () -> propertyValue));
     }
 
     /// [org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsProperties] (since 3.0.0) - HTTP only (because Micrometer limitation, no Metric GRPC support yet)
     /// [org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpTracingProperties]        (since 3.4.0) - HTTP or GRPC
     /// [org.springframework.boot.actuate.autoconfigure.logging.otlp.OtlpLoggingProperties]        (since 3.4.0) - HTTP or GRPC
     @SuppressWarnings({"unused"})
-    private static @NotNull Map<String, String> createContainerProperties() {
+    private static @NotNull Map<String, String> getContainerProperties() {
         final Integer grpcPort;
         final Integer httpPort;
         if (USE_OTELCOL) {
