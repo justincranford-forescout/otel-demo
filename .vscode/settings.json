@@ -1,0 +1,14 @@
+{
+    "github.copilot.editor.enableCodeActions": true,
+    "github.copilot.enable": {
+        "*": true,
+        "yaml": true,
+        "plaintext": false,
+        "markdown": true
+    },
+    "github.copilot.advanced": {
+        "instructionFiles": [
+            ".github/copilot.instructions.md"
+        ]
+    }
+}
