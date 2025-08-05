@@ -62,7 +62,12 @@ dependencies {
 	implementation 'com.github.f4b6a3:uuid-creator:6.1.1'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testImplementation('org.springframework.boot:spring-boot-starter-test') {
+		exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+	}
+	testImplementation 'org.junit.jupiter:junit-jupiter-api'
+	testImplementation 'org.junit.jupiter:junit-jupiter-engine'
+	testImplementation 'org.junit.jupiter:junit-jupiter-params'
 	testImplementation "org.testcontainers:grafana"
 	testImplementation "org.testcontainers:postgresql"
 //	testRuntimeOnly 'com.azure.spring:spring-cloud-azure-starter-monitor:5.22.0'
