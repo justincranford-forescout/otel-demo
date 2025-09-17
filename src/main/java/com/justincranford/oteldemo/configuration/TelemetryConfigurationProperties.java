@@ -28,8 +28,6 @@ public class TelemetryConfigurationProperties {
         private String description = "fake event counter";
         @NotBlank
         private String baseUnit = "tasks";
-        private String tagKey = "c";
-        private String tagValue = "123";
     }
 
     @Data
@@ -40,8 +38,6 @@ public class TelemetryConfigurationProperties {
         private String description = "fake temperature gauge";
         @NotBlank
         private String baseUnit = "celsius";
-        private String tagKey = "t";
-        private String tagValue = "1000";
     }
 
     @Data
@@ -52,10 +48,6 @@ public class TelemetryConfigurationProperties {
         private String description = "fake duration histogram";
         @NotBlank
         private String baseUnit = "ms";
-        private String tagKey = "d";
-        private String tagValue = "99";
-        private double minimumExpectedValue = 0.1;
-        private double maximumExpectedValue = 30000.0;
         @NotEmpty
         private List<Double> serviceLevelObjectives = List.of(10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0);
         @NotEmpty

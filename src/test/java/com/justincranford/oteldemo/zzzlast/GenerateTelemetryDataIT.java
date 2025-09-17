@@ -120,22 +120,22 @@ class GenerateTelemetryDataIT extends AbstractIT {
         private final Counter fakeEventCounter = Counter.builder(telemetryConfigurationProperties().getCounter().getName())
             .description(telemetryConfigurationProperties().getCounter().getDescription())
             .baseUnit(telemetryConfigurationProperties().getCounter().getBaseUnit())
-            .tags(telemetryConfigurationProperties().getCounter().getTagKey(), telemetryConfigurationProperties().getCounter().getTagValue())
+            .tags("terminator", "t1000")
             .register(GenerateTelemetryDataIT.super.meterRegistry());
 
         final ToDoubleFunction<Metrics> fakeTemperatureMeasurement = obj -> SECURE_RANDOM.nextInt(0, 100);
         final Gauge gauge = Gauge.builder(telemetryConfigurationProperties().getGauge().getName(), this, fakeTemperatureMeasurement)
             .description(telemetryConfigurationProperties().getGauge().getDescription())
             .baseUnit(telemetryConfigurationProperties().getGauge().getBaseUnit())
-            .tags(telemetryConfigurationProperties().getGauge().getTagKey(), telemetryConfigurationProperties().getGauge().getTagValue())
+            .tags("droid", "c3p0")
             .register(GenerateTelemetryDataIT.super.meterRegistry());
 
         final DistributionSummary fakeDurationHistogram = DistributionSummary.builder(telemetryConfigurationProperties().getHistogram().getName())
             .description(telemetryConfigurationProperties().getHistogram().getDescription())
             .baseUnit(telemetryConfigurationProperties().getHistogram().getBaseUnit())
-            .tags(telemetryConfigurationProperties().getHistogram().getTagKey(), telemetryConfigurationProperties().getHistogram().getTagValue())
-            .minimumExpectedValue(telemetryConfigurationProperties().getHistogram().getMinimumExpectedValue())
-            .maximumExpectedValue(telemetryConfigurationProperties().getHistogram().getMaximumExpectedValue())
+            .tags("droid", "r2d2")
+            .minimumExpectedValue(0.1)
+            .maximumExpectedValue(30000.0)
             .serviceLevelObjectives(telemetryConfigurationProperties().getHistogram().getServiceLevelObjectives().stream().mapToDouble(Double::doubleValue).toArray())
             .publishPercentileHistogram() // percentiles not enabled by default
             .publishPercentiles(telemetryConfigurationProperties().getHistogram().getPercentiles().stream().mapToDouble(Double::doubleValue).toArray())
