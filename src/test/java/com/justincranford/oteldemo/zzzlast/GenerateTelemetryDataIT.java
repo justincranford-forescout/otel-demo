@@ -97,10 +97,7 @@ class GenerateTelemetryDataIT extends AbstractIT {
         }
     }
 
-    /**
-     * Generate custom logs.
-     * They can be published by an OTLP exporter, scraped from container STDOUT/STDERR, or both.
-     */
+    // Generate custom logs.
     @Nested
     class Logs {
         @Order(1)
@@ -111,10 +108,7 @@ class GenerateTelemetryDataIT extends AbstractIT {
         }
     }
 
-    /**
-     * Generate custom metrics of different types: counter, gauge, and histogram.
-     * They can be published by an OTLP exporter, scraped from the /actuator/prometheus endpoint, or both.
-     */
+    // Generate custom metrics: counter, gauge, and histogram.
     @Nested
     class Metrics {
         private final Counter fakeEventCounter = Counter.builder(telemetryConfigurationProperties().getCounter().getName())
@@ -171,13 +165,7 @@ class GenerateTelemetryDataIT extends AbstractIT {
         }
     }
 
-    /**
-     * Generate traces by calling /actuator/* endpoints, /hello endpoint, and /hello/telemetry endpoint.
-     * Traces can only be published by an OTLP exporter; no standard exists to support scraping traces from an endpoint.
-     * <P>
-     * Traces generate metrics too (e.g. HTTP trace-metrics); they are published in the /actuator/prometheus endpoint.
-     * Trace-Metrics can be published by an OTLP exporter, scraped from the /actuator/prometheus endpoint, or both.
-     */
+    // Generate traces: GET /actuator/*, GET /hello, GET /hello/telemetry.
     @Nested
     class Traces {
         private static Stream<String> actuatorEndpoints() {
