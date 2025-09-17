@@ -1,5 +1,6 @@
 package com.justincranford.oteldemo;
 
+import com.justincranford.oteldemo.configuration.TelemetryConfigurationProperties;
 import com.justincranford.oteldemo.containers.ContainerManager;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.Getter;
@@ -34,6 +35,9 @@ public abstract class AbstractIT {
 
     @Autowired
     private MeterRegistry meterRegistry;
+
+    @Autowired
+    private TelemetryConfigurationProperties telemetryConfigurationProperties;
 
     @Value("${server.address:localhost}")
     private String serverAddress;

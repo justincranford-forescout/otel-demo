@@ -17,7 +17,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -118,32 +117,30 @@ class GenerateTelemetryDataIT extends AbstractIT {
      */
     @Nested
     class Metrics {
-        private final Counter fakeEventCounter = Counter.builder("fake_event")
-            .description("fake event counter")
-            .baseUnit("tasks")
-            .tags("c", "123")
+        private final Counter fakeEventCounter = Counter.builder(telemetryConfigurationProperties().getCounter().getName())
+            .description(telemetryConfigurationProperties().getCounter().getDescription())
+            .baseUnit(telemetryConfigurationProperties().getCounter().getBaseUnit())
+            .tags(telemetryConfigurationProperties().getCounter().getTagKey(), telemetryConfigurationProperties().getCounter().getTagValue())
             .register(GenerateTelemetryDataIT.super.meterRegistry());
 
         final ToDoubleFunction<Metrics> fakeTemperatureMeasurement = obj -> SECURE_RANDOM.nextInt(0, 100);
-        final Gauge gauge = Gauge.builder("fake_temperature", this, fakeTemperatureMeasurement)
-            .description("fake temperature gauge")
-            .baseUnit("celsius")
-            .tags("t", "1000")
+        final Gauge gauge = Gauge.builder(telemetryConfigurationProperties().getGauge().getName(), this, fakeTemperatureMeasurement)
+            .description(telemetryConfigurationProperties().getGauge().getDescription())
+            .baseUnit(telemetryConfigurationProperties().getGauge().getBaseUnit())
+            .tags(telemetryConfigurationProperties().getGauge().getTagKey(), telemetryConfigurationProperties().getGauge().getTagValue())
             .register(GenerateTelemetryDataIT.super.meterRegistry());
 
-        final DistributionSummary fakeDurationHistogram = DistributionSummary.builder("fake_duration")
-            .description("fake duration histogram")
-            .baseUnit("ms")
-            .tags("d", "99")
-            // buckets of per-pod absolute values
-            .minimumExpectedValue(0.1)     // set minimum, to guarantee that bucket boundary is reported
-            .maximumExpectedValue(30000.0) // set maximum, to guarantee that bucket boundary is reported
-            .serviceLevelObjectives(10, 50, 100, 500, 1000, 5000, 10000)  // set to your SLOs and SLAs, to guarantee those value bucket boundaries are reported
-            // buckets of per-pod computed percentiles (n.b. worse case)
-            .publishPercentileHistogram() // percentiles are not enabled by default (i.e. only absolute value buckets), so enable computing and reporting percentiles
-            .publishPercentiles(0.500, 0.950, 0.990, 0.995) // set to your SLOs and SLAs, to guarantee those percentile bucket boundaries are reported (e.g. P50, P95, P99, P99.5)
-            .percentilePrecision(5) // higher precision needed to aggregate many per-pod percentiles (e.g. 3 digits per-pod, and 100 pods => 2 extra digits per-pod)
-            .distributionStatisticExpiry(Duration.ofMinutes(10)) // limit age of data used to compute percentiles, and make sure it is higher than worst case metrics collection delay
+        final DistributionSummary fakeDurationHistogram = DistributionSummary.builder(telemetryConfigurationProperties().getHistogram().getName())
+            .description(telemetryConfigurationProperties().getHistogram().getDescription())
+            .baseUnit(telemetryConfigurationProperties().getHistogram().getBaseUnit())
+            .tags(telemetryConfigurationProperties().getHistogram().getTagKey(), telemetryConfigurationProperties().getHistogram().getTagValue())
+            .minimumExpectedValue(telemetryConfigurationProperties().getHistogram().getMinimumExpectedValue())
+            .maximumExpectedValue(telemetryConfigurationProperties().getHistogram().getMaximumExpectedValue())
+            .serviceLevelObjectives(telemetryConfigurationProperties().getHistogram().getServiceLevelObjectives().stream().mapToDouble(Double::doubleValue).toArray())
+            .publishPercentileHistogram() // percentiles not enabled by default
+            .publishPercentiles(telemetryConfigurationProperties().getHistogram().getPercentiles().stream().mapToDouble(Double::doubleValue).toArray())
+            .percentilePrecision(telemetryConfigurationProperties().getHistogram().getPercentilePrecision())
+            .distributionStatisticExpiry(telemetryConfigurationProperties().getHistogram().getDistributionStatisticExpiry())
             .register(GenerateTelemetryDataIT.super.meterRegistry());
 
         @Order(1)
@@ -152,7 +149,7 @@ class GenerateTelemetryDataIT extends AbstractIT {
             log.info("Starting Metrics.counter thread...");
             final LongConsumer recordFakeEvent = currentIteration -> fakeEventCounter.increment();
             doIndefiniteLoopInDaemonThread(recordFakeEvent, multiplier * MIN_MILLIS_WAIT_COUNTER_METRIC, multiplier * MAX_MILLIS_WAIT_COUNTER_METRIC, "increment fake event counter");
-            logPrometheusMetrics(MIN_SAMPLES_WAIT_COUNTER_METRIC * multiplier * MAX_MILLIS_WAIT_COUNTER_METRIC, "fake_event");
+            logPrometheusMetrics(MIN_SAMPLES_WAIT_COUNTER_METRIC * multiplier * MAX_MILLIS_WAIT_COUNTER_METRIC, telemetryConfigurationProperties().getCounter().getName());
         }
 
         @Order(1)
@@ -161,16 +158,16 @@ class GenerateTelemetryDataIT extends AbstractIT {
             log.info("Starting Metrics.gauge thread...");
             final LongConsumer measureFakeTemperature = currentIteration -> gauge.measure();
             doIndefiniteLoopInDaemonThread(measureFakeTemperature, multiplier * MIN_MILLIS_WAIT_GAUGE_METRIC, multiplier * MAX_MILLIS_WAIT_GAUGE_METRIC, "measure fake temperature");
-            logPrometheusMetrics(MIN_SAMPLES_WAIT_GAUGE_METRIC * multiplier * MAX_MILLIS_WAIT_GAUGE_METRIC, "fake_temperature");
+            logPrometheusMetrics(MIN_SAMPLES_WAIT_GAUGE_METRIC * multiplier * MAX_MILLIS_WAIT_GAUGE_METRIC, telemetryConfigurationProperties().getGauge().getName());
         }
 
         @Order(1)
         @Test
         void histogram() {
             log.info("Starting Metrics.histogram thread...");
-            final LongConsumer recordFakeDuration = currentIteration -> fakeDurationHistogram.record(SECURE_RANDOM.nextDouble(1, 200));
+            final LongConsumer recordFakeDuration = currentIteration -> fakeDurationHistogram.record(SECURE_RANDOM.nextDouble(0.1, 200.0));
             doIndefiniteLoopInDaemonThread(recordFakeDuration, multiplier * MIN_MILLIS_WAIT_HISTOGRAM_GAUGE_METRIC, multiplier * MAX_MILLIS_WAIT_HISTOGRAM_GAUGE_METRIC, "record duration histogram");
-            logPrometheusMetrics(MIN_SAMPLES_WAIT_HISTOGRAM_GAUGE_METRIC * multiplier * MAX_MILLIS_WAIT_HISTOGRAM_GAUGE_METRIC, "fake_duration");
+            logPrometheusMetrics(MIN_SAMPLES_WAIT_HISTOGRAM_GAUGE_METRIC * multiplier * MAX_MILLIS_WAIT_HISTOGRAM_GAUGE_METRIC, telemetryConfigurationProperties().getHistogram().getName());
         }
     }
 
